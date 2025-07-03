@@ -1,0 +1,238 @@
+---
+title: "Getting Started with MINTer"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with MINTer}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Introduction
+
+MINTer (Malaria INTervention Emulator Runner) is a comprehensive R package that combines malaria simulation with neural network-based emulation for rapid prediction of intervention outcomes.
+
+## Installation
+
+```r
+# Install from GitHub
+devtools::install_github("CosmoNaught/MINTer")
+
+# Load the package
+library(MINTer)
+```
+
+## Python Dependencies
+
+MINTer requires Python with numpy, torch, and pandas. Install them using:
+
+```r
+# Install Python dependencies
+reticulate::py_install(c("numpy", "torch", "pandas"))
+
+# Initialize Python (this is done automatically when needed)
+initialize_python()
+```
+
+## Quick Start
+
+### 1. Create Scenarios
+
+```r
+# Create intervention scenarios
+scenarios <- create_lhs_scenarios(
+  eir = c(5.2, 35.8, 180.5),
+  dn0_use = c(0.15, 0.35, 0.55),
+  dn0_future = c(0.20, 0.45, 0.65),
+  Q0 = c(0.65, 0.75, 0.85),
+  phi_bednets = c(0.45, 0.65, 0.75),
+  seasonal = c(0, 1, 1),
+  routine = c(0, 0, 1),
+  itn_use = c(0.25, 0.55, 0.85),
+  irs_use = c(0.10, 0.35, 0.70),
+  itn_future = c(0.30, 0.60, 0.90),
+  irs_future = c(0.15, 0.40, 0.75),
+  lsm = c(0.05, 0.45, 0.85)
+)
+```
+
+### 2. Run Simulations (Optional)
+
+If you want to run full malariasimulation models:
+
+```r
+# Load required data
+bednet_params <- readRDS("path/to/bednet_params.RDS")
+lhs_data <- read.csv("Data/lhs_scenarios.csv")
+
+# Set parameters
+HUMAN_POPULATION <- 100000
+SIM_LENGTH <- 12 * 365  # 12 years
+param_index <- 1
+reps <- 8
+
+# Get runtime parameters
+param_list <- lapply(1:param_index, function(ps) {
+  get_runtime_parameters(ps, lhs_data, HUMAN_POPULATION, bednet_params, SIM_LENGTH)
+})
+
+# Run simulation
+results <- local_cluster_malariasim_controller(param_list[[1]], reps)
+```
+
+### 3. Run Emulator for Rapid Predictions
+
+```r
+# Create scenarios for emulator
+scenarios <- create_scenarios(
+  eir = c(5.2, 35.8, 180.5),
+  dn0_use = c(0.15, 0.35, 0.55),
+  dn0_future = c(0.20, 0.45, 0.65),
+  Q0 = c(0.65, 0.75, 0.85),
+  phi_bednets = c(0.45, 0.65, 0.75),
+  seasonal = c(0, 1, 1),
+  routine = c(0, 0, 1),
+  itn_use = c(0.25, 0.55, 0.85),
+  irs_use = c(0.10, 0.35, 0.70),
+  itn_future = c(0.30, 0.60, 0.90),
+  irs_future = c(0.15, 0.40, 0.75),
+  lsm = c(0.05, 0.45, 0.85)
+)
+
+# Run emulator
+results <- run_malaria_emulator_v2(
+  scenarios = scenarios,
+  predictor = 'prevalence',
+  models_base_dir = '/path/to/trained/models',
+  output_dir = './emulator_output',
+  model_types = c('GRU', 'LSTM')
+)
+```
+
+### 4. Working with Database Results
+
+If you have simulation results in a DuckDB database:
+
+```r
+# Run emulator on database parameters
+results <- run_malaria_emulator(
+  db_path = "/path/to/database.duckdb",
+  param_index = 10,
+  predictor = "prevalence",
+  models_base_dir = "/path/to/trained/models",
+  output_dir = "./emulator_output"
+)
+
+# Run with counterfactual analysis
+results <- run_malaria_emulator(
+  db_path = "/path/to/database.duckdb",
+  param_index = 10,
+  predictor = "prevalence",
+  counterfactual = list(eir = c(1, 10, 100)),
+  models_base_dir = "/path/to/trained/models"
+)
+```
+
+## Model Types
+
+MINTer supports two types of neural network models:
+- **GRU** (Gated Recurrent Unit): Generally faster, good performance
+- **LSTM** (Long Short-Term Memory): May capture longer-term dependencies better
+
+You can use either or both models:
+
+```r
+# Use only GRU
+results <- run_malaria_emulator_v2(
+  scenarios = scenarios,
+  predictor = 'prevalence',
+  model_types = c('GRU')
+)
+
+# Use only LSTM
+results <- run_malaria_emulator_v2(
+  scenarios = scenarios,
+  predictor = 'prevalence',
+  model_types = c('LSTM')
+)
+
+# Use both (default)
+results <- run_malaria_emulator_v2(
+  scenarios = scenarios,
+  predictor = 'prevalence',
+  model_types = c('GRU', 'LSTM')
+)
+```
+
+## Predictors
+
+MINTer can predict two outcomes:
+- **prevalence**: Malaria prevalence (proportion of population infected)
+- **cases**: Clinical cases per 1000 population
+
+```r
+# Predict prevalence
+results_prev <- run_malaria_emulator_v2(
+  scenarios = scenarios,
+  predictor = 'prevalence'
+)
+
+# Predict cases
+results_cases <- run_malaria_emulator_v2(
+  scenarios = scenarios,
+  predictor = 'cases'
+)
+```
+
+## Output
+
+The emulator generates:
+1. **Plots**: Visualizations of predicted outcomes over time
+2. **CSV files**: Detailed predictions for each timestep
+3. **R objects**: Lists containing all predictions and metadata
+
+All outputs are saved to the specified `output_dir`.
+
+## Tips
+
+1. **Model Directory Structure**: Trained models should be organized as:
+   ```
+   models_base_dir/
+   ├── prevalence/
+   │   ├── gru_best.pt
+   │   ├── lstm_best.pt
+   │   ├── static_scaler.pkl
+   │   └── args.json
+   └── cases/
+       ├── gru_best.pt
+       ├── lstm_best.pt
+       ├── static_scaler.pkl
+       └── args.json
+   ```
+
+2. **Performance**: The emulator is much faster than running full simulations:
+   - Full simulation: ~minutes per scenario
+   - Emulator: ~seconds per scenario
+
+3. **Accuracy**: The neural networks are trained on simulation outputs and provide good approximations, but for final analysis, consider validating important results with full simulations.
+
+## Troubleshooting
+
+If you encounter Python-related errors:
+
+```r
+# Check Python configuration
+reticulate::py_config()
+
+# Manually initialize Python
+initialize_python()
+
+# Install missing Python packages
+reticulate::py_install("package_name")
+```

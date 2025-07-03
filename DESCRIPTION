@@ -1,12 +1,35 @@
 Package: MINTer
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
-Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+Title: Malaria INTervention Emulator Runner
+Version: 0.1.0
+Authors@R: c(
+    person("Cosmo", "Santoni", email = "cosmo.santoni@imperial.ac.uk", 
+           role = c("aut", "cre")))
+Description: A comprehensive package for malaria intervention simulation and 
+    neural network-based emulation. Combines malariasimulation with trained 
+    GRU/LSTM models for rapid prediction of intervention outcomes.
+License: MIT + file LICENSE
 Encoding: UTF-8
+LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
+Depends: 
+    R (>= 4.0.0)
+Imports:
+    reticulate (>= 1.30),
+    DBI,
+    duckdb,
+    tidyverse,
+    ggplot2,
+    jsonlite,
+    malariasimulation,
+    data.table,
+    future,
+    future.apply,
+    progressr,
+    dplyr
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
+VignetteBuilder: knitr
