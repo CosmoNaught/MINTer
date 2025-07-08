@@ -1,6 +1,6 @@
-test_that("create_lhs_scenarios works correctly", {
+test_that("create_malariasim_scenarios works correctly", {
   # Test basic functionality
-  scenarios <- create_lhs_scenarios(
+  scenarios <- create_malariasim_scenarios(
     eir = c(5.2, 35.8),
     dn0_use = c(0.15, 0.35),
     dn0_future = c(0.20, 0.45),
@@ -17,15 +17,15 @@ test_that("create_lhs_scenarios works correctly", {
   
   expect_equal(nrow(scenarios), 2)
   expect_equal(ncol(scenarios), 12)
-  expect_true(file.exists("Data/lhs_scenarios.csv"))
+  expect_true(file.exists("Data/malariasim_scenarios.csv"))
   
   # Clean up
   unlink("Data", recursive = TRUE)
 })
 
-test_that("create_lhs_scenarios handles unequal lengths", {
+test_that("create_malariasim_scenarios handles unequal lengths", {
   expect_error(
-    create_lhs_scenarios(
+    create_malariasim_scenarios(
       eir = c(5.2, 35.8, 100),  # 3 elements
       dn0_use = c(0.15, 0.35),   # 2 elements
       dn0_future = c(0.20, 0.45),

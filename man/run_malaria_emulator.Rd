@@ -2,11 +2,12 @@
 % Please edit documentation in R/emulator_main.R
 \name{run_malaria_emulator}
 \alias{run_malaria_emulator}
-\title{Run Malaria Emulator (Original Version)}
+\title{Run Malaria Emulator (Unified Version)}
 \usage{
 run_malaria_emulator(
-  db_path,
+  db_path = NULL,
   param_index = NULL,
+  scenarios = NULL,
   predictor = "prevalence",
   models_base_dir = ".",
   output_dir = NULL,
@@ -14,21 +15,24 @@ run_malaria_emulator(
   window_size = 14,
   plot_tight = FALSE,
   device = NULL,
-  model_types = c("GRU", "LSTM")
+  model_types = c("GRU", "LSTM"),
+  time_steps = 2190
 )
 }
 \arguments{
-\item{db_path}{Path to DuckDB database}
+\item{db_path}{Path to DuckDB database (for database mode)}
 
-\item{param_index}{Parameter index (NULL for random selection)}
+\item{param_index}{Parameter index for database mode (NULL for random selection)}
+
+\item{scenarios}{Data frame with scenario parameters (for scenario mode)}
 
 \item{predictor}{"prevalence" or "cases"}
 
 \item{models_base_dir}{Base directory with trained models}
 
-\item{output_dir}{Directory to save outputs}
+\item{output_dir}{Directory to save outputs (auto-generated if NULL)}
 
-\item{counterfactual}{Named list, e.g. list(eir = c(1, 10, 100))}
+\item{counterfactual}{Named list for counterfactual analysis (database mode only)}
 
 \item{window_size}{Window size for rolling average}
 
@@ -36,21 +40,43 @@ run_malaria_emulator(
 
 \item{device}{"cpu" or "cuda"}
 
-\item{model_types}{Vector of model types to use}
+\item{model_types}{Vector of model types to use ("GRU", "LSTM", or both)}
+
+\item{time_steps}{Number of time steps for scenario predictions (in days)}
 }
 \value{
 List with results
 }
 \description{
-Run Malaria Emulator (Original Version)
+Runs malaria emulator in either database mode or scenario mode.
 }
 \examples{
 \dontrun{
+# Database mode with counterfactual
 results <- run_malaria_emulator(
   db_path = "/path/to/database.duckdb",
   param_index = 10,
   predictor = "prevalence",
   counterfactual = list(eir = c(1, 10, 100))
+)
+
+# Database mode with random parameter
+results <- run_malaria_emulator(
+  db_path = "/path/to/database.duckdb",
+  predictor = "prevalence"
+)
+
+# Scenario mode
+scenarios <- create_scenarios(
+  eir = c(5.2, 35.8),
+  dn0_use = c(0.15, 0.35),
+  # ... other parameters
+)
+
+results <- run_malaria_emulator(
+  scenarios = scenarios,
+  predictor = 'prevalence',
+  model_types = c('GRU', 'LSTM')
 )
 }
 }

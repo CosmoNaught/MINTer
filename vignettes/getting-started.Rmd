@@ -46,7 +46,7 @@ initialize_python()
 
 ```r
 # Create intervention scenarios
-scenarios <- create_lhs_scenarios(
+scenarios <- create_malariasim_scenarios(
   eir = c(5.2, 35.8, 180.5),
   dn0_use = c(0.15, 0.35, 0.55),
   dn0_future = c(0.20, 0.45, 0.65),
@@ -69,7 +69,7 @@ If you want to run full malariasimulation models:
 ```r
 # Load required data
 bednet_params <- readRDS("path/to/bednet_params.RDS")
-lhs_data <- read.csv("Data/lhs_scenarios.csv")
+data <- read.csv("Data/malariasim_scenarios.csv")
 
 # Set parameters
 HUMAN_POPULATION <- 100000

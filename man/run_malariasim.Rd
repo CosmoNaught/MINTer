@@ -6,7 +6,7 @@
 \usage{
 run_malariasim(
   max_threads = 12,
-  lhs_scenario = "Data/lhs_scenarios.csv",
+  lhs_scenario = "Data/malariasim_scenarios.csv",
   bednet_params_path,
   output_dir = "Data",
   reps = 8,
@@ -17,7 +17,7 @@ run_malariasim(
 \arguments{
 \item{max_threads}{Maximum number of parallel workers to use}
 
-\item{lhs_scenario}{Path to LHS scenarios CSV file (default: "Data/lhs_scenarios.csv")}
+\item{lhs_scenario}{Path to LHS scenarios CSV file (default: "Data/malariasim_scenarios.csv")}
 
 \item{bednet_params_path}{Path to bednet parameters RDS file}
 
@@ -40,7 +40,7 @@ This function handles dependency checking, parallel processing, and progress tra
 \dontrun{
 results <- run_malariasim(
   max_threads = 12,
-  lhs_scenario = "Data/lhs_scenarios.csv",
+  lhs_scenario = "Data/malariasim_scenarios.csv",
   bednet_params_path = "/path/to/bednet_params.RDS"
 )
 }

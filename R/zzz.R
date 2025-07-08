@@ -61,7 +61,7 @@ pd <- NULL
   # reticulate::use_python("/usr/bin/python3", required = FALSE)
   
   # Message about Python dependencies
-  packageStartupMessage("MINTer: Malaria INTervention Emulator and Simulator")
+  packageStartupMessage("MINTer: Malaria INTervention Emulator and Runner")
   packageStartupMessage("Note: Python dependencies (numpy, torch, pandas) will be loaded when needed.")
   
   # Initialize Python modules on first use

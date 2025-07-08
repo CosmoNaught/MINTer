@@ -2,7 +2,7 @@
 % Please edit documentation in R/emulator_main.R
 \name{create_scenario_plots}
 \alias{create_scenario_plots}
-\title{Create Scenario Plots}
+\title{Create Scenario Plots (Helper Function)}
 \usage{
 create_scenario_plots(
   predictions,
@@ -27,5 +27,6 @@ create_scenario_plots(
 List of ggplot objects
 }
 \description{
-Create Scenario Plots
+Create Scenario Plots (Helper Function)
 }
+\keyword{internal}
