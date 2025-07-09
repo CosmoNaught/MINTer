@@ -3,7 +3,6 @@ import torch.nn as nn
 from torch.amp import autocast
 import numpy as np
 import pandas as pd
-import sklearn
 
 class GRUModel(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, dropout_prob, num_layers=1, predictor='prevalence'):

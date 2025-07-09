@@ -1,6 +1,6 @@
 Package: MINTer
 Title: Malaria INTervention Emulator Runner
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: c(
     person("Cosmo", "Santoni", email = "cosmo.santoni@imperial.ac.uk", 
            role = c("aut", "cre")))

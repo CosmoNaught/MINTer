@@ -1,55 +1,3 @@
-# # zzz.R  ────────────────────────────────────────────────────────────────────────
-# .onLoad <- function(libname, pkgname) {
-#   ns <- asNamespace(pkgname)
-#   packageStartupMessage("MINTer: Malaria INTervention Emulator Runner")
-
-#   ## ------------------------------------------------------------------
-#   ## 1.  Tell reticulate which Python to use, falling back to system
-#   ## ------------------------------------------------------------------
-#   py_exec <- Sys.getenv("RETICULATE_PYTHON", unset = Sys.which("python3"))
-#   if (nzchar(py_exec))
-#     try(reticulate::use_python(py_exec, required = FALSE), silent = TRUE)
-
-#   ## ------------------------------------------------------------------
-#   ## 2.  Check for required modules (but never abort install)
-#   ## ------------------------------------------------------------------
-#   required <- c("numpy", "torch", "pandas")
-
-#   for (pkg in required) {
-#     ok <- tryCatch(reticulate::py_module_available(pkg), error = function(e) FALSE)
-#     if (!ok) {
-#       packageStartupMessage(
-#         sprintf("Missing Python module '%s'. Install with:\n  reticulate::py_install('%s')",
-#                 pkg, pkg)
-#       )
-#     }
-#   }
-
-#   ## ------------------------------------------------------------------
-#   ## 3.  Active bindings so `torch`, `np`, `pd` work in R
-#   ## ------------------------------------------------------------------
-#   makeAB <- function(sym, mod) makeActiveBinding(
-#     sym, function() reticulate::import(mod, delay_load = FALSE), ns
-#   )
-#   makeAB("np",    "numpy")
-#   makeAB("torch", "torch")
-#   makeAB("pd",    "pandas")
-# }
-
-# #' Initialise (or re-initialise) Python dependencies
-# #' @export
-# initialize_python <- function() {
-#   required <- c("numpy", "torch", "pandas")
-#   missing <- required[!vapply(required, reticulate::py_module_available, logical(1))]
-#   if (length(missing))
-#     stop("Missing Python modules: ", paste(missing, collapse = ", "),
-#          "\nInstall with reticulate::py_install().", call. = FALSE)
-
-#   invisible(lapply(required, reticulate::import, delay_load = FALSE))
-#   message("Python dependencies initialised.")
-#   TRUE
-# }
-# Package startup functions
 
 # Python modules (loaded on demand)
 np <- NULL
@@ -60,12 +8,17 @@ pd <- NULL
   # Configure reticulate to use a specific Python environment if needed
   # reticulate::use_python("/usr/bin/python3", required = FALSE)
   
-  # Message about Python dependencies
-  packageStartupMessage("MINTer: Malaria INTervention Emulator and Runner")
-  packageStartupMessage("Note: Python dependencies (numpy, torch, pandas) will be loaded when needed.")
+  # Use py_require to handle safe environment installation and follow best practices
+  reticulate::py_require("numpy")
+  reticulate::py_require("pandas")
+  reticulate::py_require("torch")
+  reticulate::py_require("scikit-learn")
   
-  # Initialize Python modules on first use
-  delay_load_python()
+  # Import with delayed loading
+  np <<- reticulate::import("numpy", delay_load = TRUE)
+  torch <<- reticulate::import("torch", delay_load = TRUE)
+  pd <<- reticulate::import("pandas", delay_load = TRUE)
+  
 }
 
 #' Initialize Python Dependencies

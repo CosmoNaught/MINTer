@@ -9,10 +9,6 @@
 load_emulator_models <- function(models_base_dir = ".", predictor = "prevalence", 
                                 device = NULL) {
   
-  # Make sure torch is imported and use R's handle
-  torch <- reticulate::import("torch", delay_load = FALSE)
-  pd <- reticulate::import("pandas", delay_load = FALSE)
-  
   # Source Python helper functions if not already loaded
   if (!reticulate::py_has_attr(reticulate::py, "load_model_from_checkpoint")) {
     python_script <- system.file("python", "model_helpers.py", package = "MINTer")
@@ -122,9 +118,7 @@ generate_scenario_predictions <- function(scenarios, models, model_types = c("GR
   
   # Validate model types
   model_types <- match.arg(model_types, c("GRU", "LSTM"), several.ok = TRUE)
-  
-  np <- reticulate::import("numpy")
-  
+ 
   predictions <- list()
   
   for (i in 1:nrow(scenarios)) {
