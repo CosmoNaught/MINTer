@@ -79,8 +79,8 @@ lstm_model, lstm_hidden, lstm_layers = load_model_from_checkpoint(
 )
 
 # Move to device
-gru_model.to(torch.device('%s'))
-lstm_model.to(torch.device('%s'))
+gru_model.to(torch.float32).to(torch.device('%s'))
+lstm_model.to(torch.float32).to(torch.device('%s'))
 gru_model.eval()
 lstm_model.eval()
 
