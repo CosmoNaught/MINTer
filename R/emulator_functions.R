@@ -1,20 +1,33 @@
 #' Load Emulator Models
 #'
-#' @param models_base_dir Base directory containing model files
+#' @param models_base_dir Base directory containing model files. If NULL (default),
+#'   uses models bundled with the package.
 #' @param predictor "prevalence" or "cases"
 #' @param device "cpu" or "cuda" (NULL for auto-detect)
 #'
 #' @return List containing models and configuration
 #' @export
-load_emulator_models <- function(models_base_dir = ".", predictor = "prevalence", 
+load_emulator_models <- function(models_base_dir = NULL, predictor = "prevalence", 
                                 device = NULL) {
   
   # Source Python helper functions if not already loaded
   if (!reticulate::py_has_attr(reticulate::py, "load_model_from_checkpoint")) {
+    # First try system.file (for installed package)
     python_script <- system.file("python", "model_helpers.py", package = "MINTer")
-    if (!file.exists(python_script)) {
-      stop("Could not find model_helpers.py. Please ensure MINTer is properly installed.")
+    
+    # If empty, try development directory
+    if (python_script == "") {
+      if (file.exists("inst/python/model_helpers.py")) {
+        python_script <- "inst/python/model_helpers.py"
+      } else {
+        stop("Could not find model_helpers.py. Please ensure MINTer is properly installed or run devtools::load_all() if in development.")
+      }
     }
+    
+    if (!file.exists(python_script)) {
+      stop("model_helpers.py not found at expected location.")
+    }
+    
     reticulate::source_python(python_script)
   }
   
@@ -24,6 +37,37 @@ load_emulator_models <- function(models_base_dir = ".", predictor = "prevalence"
   }
   message(sprintf("[INFO] Using device: %s", device))
   device_obj <- torch$device(device)  # uses R handle, no py_eval()
+  
+  # Use bundled models if no base directory specified
+  if (is.null(models_base_dir)) {
+    # First try system.file for models under python directory (for installed package)
+    models_base_dir <- system.file("python/models", package = "MINTer")
+    
+    # If empty, try without python prefix
+    if (models_base_dir == "") {
+      models_base_dir <- system.file("models", package = "MINTer")
+    }
+    
+    # If still empty, try to find in development mode
+    if (models_base_dir == "") {
+      # Check if we're in the package directory
+      if (file.exists("DESCRIPTION") && file.exists("inst/models")) {
+        models_base_dir <- "inst/models"
+        message("[INFO] Using models from development directory: inst/models")
+      } else if (file.exists("DESCRIPTION") && file.exists("inst/python/models")) {
+        models_base_dir <- "inst/python/models"
+        message("[INFO] Using models from development directory: inst/python/models")
+      } else {
+        stop("Could not find bundled models. Please ensure MINTer is properly installed with model files, or run devtools::load_all() if in development.")
+      }
+    } else {
+      message(sprintf("[INFO] Using bundled models from: %s", models_base_dir))
+    }
+    
+    if (!dir.exists(models_base_dir)) {
+      stop("Models directory not found. Please ensure the package is properly set up with model files.")
+    }
+  }
   
   predictor_models_dir <- file.path(models_base_dir, predictor)
   
@@ -103,7 +147,6 @@ print(f'[INFO] LSTM model loaded: hidden_size={lstm_hidden}, num_layers={lstm_la
     models_dir = predictor_models_dir
   ))
 }
-
 #' Generate Scenario Predictions
 #'
 #' @param scenarios Data frame with scenario parameters

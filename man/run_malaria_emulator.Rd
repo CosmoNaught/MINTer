@@ -9,7 +9,7 @@ run_malaria_emulator(
   param_index = NULL,
   scenarios = NULL,
   predictor = "prevalence",
-  models_base_dir = ".",
+  models_base_dir = NULL,
   output_dir = NULL,
   counterfactual = NULL,
   window_size = 14,
@@ -28,7 +28,8 @@ run_malaria_emulator(
 
 \item{predictor}{"prevalence" or "cases"}
 
-\item{models_base_dir}{Base directory with trained models}
+\item{models_base_dir}{Base directory with trained models. If NULL (default),
+uses models bundled with the package.}
 
 \item{output_dir}{Directory to save outputs (auto-generated if NULL)}
 
@@ -52,7 +53,7 @@ Runs malaria emulator in either database mode or scenario mode.
 }
 \examples{
 \dontrun{
-# Database mode with counterfactual
+# Database mode with counterfactual (using bundled models)
 results <- run_malaria_emulator(
   db_path = "/path/to/database.duckdb",
   param_index = 10,
@@ -60,13 +61,13 @@ results <- run_malaria_emulator(
   counterfactual = list(eir = c(1, 10, 100))
 )
 
-# Database mode with random parameter
+# Database mode with random parameter (using bundled models)
 results <- run_malaria_emulator(
   db_path = "/path/to/database.duckdb",
   predictor = "prevalence"
 )
 
-# Scenario mode
+# Scenario mode (using bundled models)
 scenarios <- create_scenarios(
   eir = c(5.2, 35.8),
   dn0_use = c(0.15, 0.35),
@@ -76,6 +77,14 @@ scenarios <- create_scenarios(
 results <- run_malaria_emulator(
   scenarios = scenarios,
   predictor = 'prevalence',
+  model_types = c('GRU', 'LSTM')
+)
+
+# Using custom models from a different directory
+results <- run_malaria_emulator(
+  scenarios = scenarios,
+  predictor = 'prevalence',
+  models_base_dir = '/path/to/custom/models',
   model_types = c('GRU', 'LSTM')
 )
 }

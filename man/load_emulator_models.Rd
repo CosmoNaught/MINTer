@@ -5,13 +5,14 @@
 \title{Load Emulator Models}
 \usage{
 load_emulator_models(
-  models_base_dir = ".",
+  models_base_dir = NULL,
   predictor = "prevalence",
   device = NULL
 )
 }
 \arguments{
-\item{models_base_dir}{Base directory containing model files}
+\item{models_base_dir}{Base directory containing model files. If NULL (default),
+uses models bundled with the package.}
 
 \item{predictor}{"prevalence" or "cases"}
 

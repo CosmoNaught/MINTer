@@ -88,7 +88,8 @@ create_malariasim_scenarios <- function(eir, dn0_use, dn0_future, Q0, phi_bednet
 #'
 #' @param max_threads Maximum number of parallel workers to use
 #' @param lhs_scenario Path to LHS scenarios CSV file (default: "Data/malariasim_scenarios.csv")
-#' @param bednet_params_path Path to bednet parameters RDS file
+#' @param bednet_params_path Path to bednet parameters RDS file. If NULL (default),
+#'   uses the bednet parameters bundled with the package.
 #' @param output_dir Directory to save simulation outputs (default: "Data")
 #' @param reps Number of replicates per parameter set (default: 8)
 #' @param human_population Human population size (default: 100000)
@@ -99,16 +100,23 @@ create_malariasim_scenarios <- function(eir, dn0_use, dn0_future, Q0, phi_bednet
 #'
 #' @examples
 #' \dontrun{
+#' # Using bundled bednet parameters
+#' results <- run_malariasim(
+#'   max_threads = 12,
+#'   lhs_scenario = "Data/malariasim_scenarios.csv"
+#' )
+#' 
+#' # Using custom bednet parameters
 #' results <- run_malariasim(
 #'   max_threads = 12,
 #'   lhs_scenario = "Data/malariasim_scenarios.csv",
-#'   bednet_params_path = "/path/to/bednet_params.RDS"
+#'   bednet_params_path = "/path/to/custom/bednet_params.RDS"
 #' )
 #' }
 run_malariasim <- function(max_threads = 12,
                           lhs_scenario = "Data/malariasim_scenarios.csv",
-                          bednet_params_path,
-                          output_dir = "Data",
+                          bednet_params_path = NULL,
+                          output_dir = NULL, #"Data"
                           reps = 8,
                           human_population = 100000,
                           sim_years = 12) {
@@ -156,6 +164,25 @@ run_malariasim <- function(max_threads = 12,
   safe_ncores <- function(requested) {
     avail <- parallel::detectCores(logical = FALSE)  # physical cores only
     max(1L, min(requested, max_threads, avail))
+  }
+  
+  # Handle bednet parameters path
+  if (is.null(bednet_params_path)) {
+    # Use bundled bednet parameters
+    bednet_params_path <- system.file("extdata", "bednet_params_raw.RDS", package = "MINTer")
+    
+    # If not found in installed package, check development directory
+    if (bednet_params_path == "" || !file.exists(bednet_params_path)) {
+      if (file.exists("inst/extdata/bednet_params_raw.RDS")) {
+        bednet_params_path <- "inst/extdata/bednet_params_raw.RDS"
+        message("[INFO] Using bednet parameters from development directory")
+      } else {
+        stop("Could not find bundled bednet parameters. Please ensure MINTer is properly installed ",
+             "with bednet_params_raw.RDS, or specify a custom path with bednet_params_path parameter.")
+      }
+    } else {
+      message("[INFO] Using bundled bednet parameters")
+    }
   }
   
   # Load input data
