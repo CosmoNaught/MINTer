@@ -4,10 +4,13 @@
 \alias{initialize_python}
 \title{Initialize Python Dependencies}
 \usage{
-initialize_python()
+initialize_python(verbose = TRUE)
+}
+\arguments{
+\item{verbose}{Logical, whether to print messages (default: TRUE)}
 }
 \description{
-This function initializes the Python dependencies required for the emulator.
+This function initialises the Python dependencies required for the emulator.
 It is called automatically when needed, but can be called manually to
 pre-load the dependencies.
 }

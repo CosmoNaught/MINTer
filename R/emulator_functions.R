@@ -1,3 +1,153 @@
+# #' Load Emulator Models
+# #'
+# #' @param models_base_dir Base directory containing model files. If NULL (default),
+# #'   uses models bundled with the package.
+# #' @param predictor "prevalence" or "cases"
+# #' @param device "cpu" or "cuda" (NULL for auto-detect)
+# #'
+# #' @return List containing models and configuration
+# #' @export
+# load_emulator_models <- function(models_base_dir = NULL, predictor = "prevalence", 
+#                                 device = NULL) {
+  
+#   # Source Python helper functions if not already loaded
+#   if (!reticulate::py_has_attr(reticulate::py, "load_model_from_checkpoint")) {
+#     # First try system.file (for installed package)
+#     python_script <- system.file("python", "model_helpers.py", package = "MINTer")
+    
+#     # If empty, try development directory
+#     if (python_script == "") {
+#       if (file.exists("inst/python/model_helpers.py")) {
+#         python_script <- "inst/python/model_helpers.py"
+#       } else {
+#         stop("Could not find model_helpers.py. Please ensure MINTer is properly installed or run devtools::load_all() if in development.")
+#       }
+#     }
+    
+#     if (!file.exists(python_script)) {
+#       stop("model_helpers.py not found at expected location.")
+#     }
+    
+#     reticulate::source_python(python_script)
+#   }
+  
+#   # Set device
+#   if (is.null(device)) {
+#     device <- if (torch$cuda$is_available()) "cuda" else "cpu"
+#   }
+#   message(sprintf("[INFO] Using device: %s", device))
+#   device_obj <- torch$device(device)  # uses R handle, no py_eval()
+  
+#   # Use bundled models if no base directory specified
+#   if (is.null(models_base_dir)) {
+#     # First try system.file for models under python directory (for installed package)
+#     models_base_dir <- system.file("python/models", package = "MINTer")
+    
+#     # If empty, try without python prefix
+#     if (models_base_dir == "") {
+#       models_base_dir <- system.file("models", package = "MINTer")
+#     }
+    
+#     # If still empty, try to find in development mode
+#     if (models_base_dir == "") {
+#       # Check if we're in the package directory
+#       if (file.exists("DESCRIPTION") && file.exists("inst/models")) {
+#         models_base_dir <- "inst/models"
+#         message("[INFO] Using models from development directory: inst/models")
+#       } else if (file.exists("DESCRIPTION") && file.exists("inst/python/models")) {
+#         models_base_dir <- "inst/python/models"
+#         message("[INFO] Using models from development directory: inst/python/models")
+#       } else {
+#         stop("Could not find bundled models. Please ensure MINTer is properly installed with model files, or run devtools::load_all() if in development.")
+#       }
+#     } else {
+#       message(sprintf("[INFO] Using bundled models from: %s", models_base_dir))
+#     }
+    
+#     if (!dir.exists(models_base_dir)) {
+#       stop("Models directory not found. Please ensure the package is properly set up with model files.")
+#     }
+#   }
+  
+#   predictor_models_dir <- file.path(models_base_dir, predictor)
+  
+#   # Load training args
+#   args_path <- file.path(predictor_models_dir, "args.json")
+  
+#   if (!file.exists(args_path)) {
+#     stop(sprintf("Could not find args.json in %s\nMake sure you have trained models for '%s' predictor.\nExpected files: gru_best.pt, lstm_best.pt, static_scaler.pkl, args.json", 
+#                 predictor_models_dir, predictor))
+#   }
+  
+#   training_args <- jsonlite::fromJSON(args_path)
+#   message(sprintf("[INFO] Loaded training parameters from %s", args_path))
+  
+#   # Load scaler
+#   scaler_path <- file.path(predictor_models_dir, "static_scaler.pkl")
+#   static_scaler <- pd$read_pickle(scaler_path)
+  
+#   # Define static covariates
+#   static_covars <- c("eir", "dn0_use", "dn0_future", "Q0", "phi_bednets",
+#                     "seasonal", "routine", "itn_use", "irs_use", 
+#                     "itn_future", "irs_future", "lsm")
+  
+#   # Determine input size
+#   use_cyclical_time <- training_args$use_cyclical_time %||% TRUE
+#   input_size <- ifelse(use_cyclical_time, 2 + length(static_covars), 1 + length(static_covars))
+  
+#   # Model parameters
+#   hidden_size <- training_args$hidden_size %||% 256
+#   num_layers <- training_args$num_layers %||% 4
+#   dropout <- training_args$dropout %||% 0.05
+  
+#   # Load models using Python function
+#   gru_path <- file.path(predictor_models_dir, "gru_best.pt")
+#   lstm_path <- file.path(predictor_models_dir, "lstm_best.pt")
+  
+#   message(sprintf("[INFO] Loading GRU model from %s", gru_path))
+#   message(sprintf("[INFO] Loading LSTM model from %s", lstm_path))
+  
+#   # Load Python models
+#   reticulate::py_run_string(sprintf("
+# import warnings
+# warnings.filterwarnings('ignore')
+
+# # Load GRU model
+# gru_model, gru_hidden, gru_layers = load_model_from_checkpoint(
+#     '%s', %d, %d, 1, %f, %d, 'gru', '%s'
+# )
+
+# # Load LSTM model
+# lstm_model, lstm_hidden, lstm_layers = load_model_from_checkpoint(
+#     '%s', %d, %d, 1, %f, %d, 'lstm', '%s'
+# )
+
+# # Move to device
+# gru_model.to(torch.float32).to(torch.device('%s'))
+# lstm_model.to(torch.float32).to(torch.device('%s'))
+# gru_model.eval()
+# lstm_model.eval()
+
+# # Report actual architectures
+# print(f'[INFO] GRU model loaded: hidden_size={gru_hidden}, num_layers={gru_layers}')
+# print(f'[INFO] LSTM model loaded: hidden_size={lstm_hidden}, num_layers={lstm_layers}')
+# ", gru_path, input_size, hidden_size, dropout, num_layers, predictor,
+#    lstm_path, input_size, hidden_size, dropout, num_layers, predictor,
+#    device, device))
+  
+#   return(list(
+#     gru_model = reticulate::py$gru_model,
+#     lstm_model = reticulate::py$lstm_model,
+#     static_scaler = static_scaler,
+#     static_covars = static_covars,
+#     use_cyclical_time = use_cyclical_time,
+#     predictor = predictor,
+#     device = device_obj,
+#     training_args = training_args,
+#     models_dir = predictor_models_dir
+#   ))
+# }
+
 #' Load Emulator Models
 #'
 #' @param models_base_dir Base directory containing model files. If NULL (default),
@@ -9,6 +159,9 @@
 #' @export
 load_emulator_models <- function(models_base_dir = NULL, predictor = "prevalence", 
                                 device = NULL) {
+  
+  # Ensure Python is initialized
+  initialize_python(verbose = FALSE)
   
   # Source Python helper functions if not already loaded
   if (!reticulate::py_has_attr(reticulate::py, "load_model_from_checkpoint")) {
@@ -147,6 +300,7 @@ print(f'[INFO] LSTM model loaded: hidden_size={lstm_hidden}, num_layers={lstm_la
     models_dir = predictor_models_dir
   ))
 }
+
 #' Generate Scenario Predictions
 #'
 #' @param scenarios Data frame with scenario parameters
