@@ -34,7 +34,7 @@ initialize_python <- function(verbose = TRUE) {
     stop("Python is not available. Please install Python and required packages.")
   }
   
-  # Force Python initialization by accessing a module
+  # Force Python initialization by accessing a module (numpy is the most robust using this!!!!)
   # This triggers the delayed load and installs packages if needed
   np_module <- np  # This accesses the delay-loaded numpy module
   

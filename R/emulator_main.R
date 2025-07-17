@@ -1,4 +1,4 @@
-#' Run Malaria Emulator (Unified Version)
+#' Run Malaria Emulator
 #'
 #' Runs malaria emulator in either database mode or scenario mode.
 #' 
@@ -18,43 +18,6 @@
 #'
 #' @return List with results
 #' @export
-#' @examples
-#' \dontrun{
-#' # Database mode with counterfactual (using bundled models)
-#' results <- run_malaria_emulator(
-#'   db_path = "/path/to/database.duckdb",
-#'   param_index = 10,
-#'   predictor = "prevalence",
-#'   counterfactual = list(eir = c(1, 10, 100))
-#' )
-#' 
-#' # Database mode with random parameter (using bundled models)
-#' results <- run_malaria_emulator(
-#'   db_path = "/path/to/database.duckdb",
-#'   predictor = "prevalence"
-#' )
-#' 
-#' # Scenario mode (using bundled models)
-#' scenarios <- create_scenarios(
-#'   eir = c(5.2, 35.8),
-#'   dn0_use = c(0.15, 0.35),
-#'   # ... other parameters
-#' )
-#' 
-#' results <- run_malaria_emulator(
-#'   scenarios = scenarios,
-#'   predictor = 'prevalence',
-#'   model_types = c('GRU', 'LSTM')
-#' )
-#' 
-#' # Using custom models from a different directory
-#' results <- run_malaria_emulator(
-#'   scenarios = scenarios,
-#'   predictor = 'prevalence',
-#'   models_base_dir = '/path/to/custom/models',
-#'   model_types = c('GRU', 'LSTM')
-#' )
-#' }
 run_malaria_emulator <- function(db_path = NULL,
                                 param_index = NULL,
                                 scenarios = NULL,
@@ -66,37 +29,33 @@ run_malaria_emulator <- function(db_path = NULL,
                                 plot_tight = FALSE,
                                 device = NULL,
                                 model_types = c("GRU", "LSTM"),
-                                time_steps = 2190) {  # 6 years default
-  
+                                time_steps = 2190) {  # 6 years default DO NOT CHANGE!
+
   # Validate inputs - must have either db_path or scenarios
   if (is.null(db_path) && is.null(scenarios)) {
     stop("Either 'db_path' or 'scenarios' must be provided")
   }
-  
+
   if (!is.null(db_path) && !is.null(scenarios)) {
     warning("Both 'db_path' and 'scenarios' provided. Using database mode.")
     scenarios <- NULL
   }
-  
-  # Validate predictor
+
   if (!predictor %in% c("prevalence", "cases")) {
     stop("Predictor must be either 'prevalence' or 'cases'")
   }
-  
-  # Validate model types
+
   valid_models <- c("GRU", "LSTM")
   if (!all(model_types %in% valid_models)) {
     stop(sprintf("Invalid model types. Must be one or more of: %s", 
                 paste(valid_models, collapse = ", ")))
   }
-  
-  # Load models
+
   message("[INFO] Loading emulator models...")
   models <- load_emulator_models(models_base_dir, predictor, device)
-  
-  # Determine operating mode based on inputs
+
   mode <- ifelse(!is.null(db_path), "database", "scenario")
-  
+ 
   # Set default output directory based on mode
   if (is.null(output_dir)) {
     # If using bundled models, create output directory in current working directory
@@ -109,10 +68,9 @@ run_malaria_emulator <- function(db_path = NULL,
                              ifelse(mode == "database", "emulator_predictions", "scenario_predictions"))
     }
   }
-  
+ 
   # Execute based on mode
   if (mode == "database") {
-    # ========== DATABASE MODE ==========
     message("[INFO] Running in database mode")
     
     # Validate counterfactual if provided
@@ -163,7 +121,6 @@ run_malaria_emulator <- function(db_path = NULL,
     return(results)
     
   } else {
-    # ========== SCENARIO MODE ==========
     message("[INFO] Running in scenario mode")
     
     # Validate scenarios
@@ -199,7 +156,7 @@ run_malaria_emulator <- function(db_path = NULL,
       model_types = model_types,
       time_steps = time_steps
     )
-    
+
     # Create and save plots
     plots <- create_scenario_plots(
       predictions = predictions,
@@ -208,7 +165,7 @@ run_malaria_emulator <- function(db_path = NULL,
       window_size = window_size,
       output_dir = output_dir
     )
-    
+
     # Display plots
     for (i in seq_along(plots)) {
       print(plots[[i]])
@@ -216,7 +173,7 @@ run_malaria_emulator <- function(db_path = NULL,
         readline(prompt = "Press [enter] to see next plot")
       }
     }
-    
+
     # Create summary results
     results <- list(
       mode = "scenario",
@@ -227,7 +184,7 @@ run_malaria_emulator <- function(db_path = NULL,
       time_steps = time_steps,
       output_dir = output_dir
     )
-    
+
     # Add summary information
     message("\n[INFO] Summary:")
     message(sprintf("  - Mode: Scenario"))
@@ -238,7 +195,7 @@ run_malaria_emulator <- function(db_path = NULL,
     message(sprintf("  - Models source: %s", 
                    ifelse(is.null(models_base_dir), "Bundled with package", models_base_dir)))
     message(sprintf("  - Output saved to: %s", output_dir))
-    
+
     return(results)
   }
 }
