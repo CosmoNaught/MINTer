@@ -37,19 +37,3 @@ A list with simulation results and metadata
 Run malaria simulations for all parameter sets in the LHS scenarios file.
 This function handles dependency checking, parallel processing, and progress tracking.
 }
-\examples{
-\dontrun{
-# Using bundled bednet parameters
-results <- run_malariasim(
-  max_threads = 12,
-  lhs_scenario = "Data/malariasim_scenarios.csv"
-)
-
-# Using custom bednet parameters
-results <- run_malariasim(
-  max_threads = 12,
-  lhs_scenario = "Data/malariasim_scenarios.csv",
-  bednet_params_path = "/path/to/custom/bednet_params.RDS"
-)
-}
-}

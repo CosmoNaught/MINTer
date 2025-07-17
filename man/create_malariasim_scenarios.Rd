@@ -50,19 +50,3 @@ A data frame of scenarios
 \description{
 Create scenarios for Malaria Simulation
 }
-\examples{
-scenarios <- create_malarisim_scenarios(
-  eir = c(5.2, 35.8),
-  dn0_use = c(0.15, 0.35),
-  dn0_future = c(0.20, 0.45),
-  Q0 = c(0.65, 0.75),
-  phi_bednets = c(0.45, 0.65),
-  seasonal = c(0, 1),
-  routine = c(0, 0),
-  itn_use = c(0.25, 0.55),
-  irs_use = c(0.10, 0.35),
-  itn_future = c(0.30, 0.60),
-  irs_future = c(0.15, 0.40),
-  lsm = c(0.05, 0.45)
-)
-}

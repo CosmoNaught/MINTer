@@ -86,8 +86,8 @@ run_malariasim <- function(max_threads = 12,
                           bednet_params_path = NULL,
                           output_dir = NULL, #"Data"
                           reps = 8,
-                          human_population = 100000,
-                          sim_years = 12) {
+                          human_population = 100000, # DO NOT CHANGE!
+                          sim_years = 12) { # DO NOT CHANGE!
   
   # Set random seed for reproducibility
   set.seed(123)

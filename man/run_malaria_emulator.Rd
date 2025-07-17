@@ -2,7 +2,7 @@
 % Please edit documentation in R/emulator_main.R
 \name{run_malaria_emulator}
 \alias{run_malaria_emulator}
-\title{Run Malaria Emulator (Unified Version)}
+\title{Run Malaria Emulator}
 \usage{
 run_malaria_emulator(
   db_path = NULL,
@@ -50,42 +50,4 @@ List with results
 }
 \description{
 Runs malaria emulator in either database mode or scenario mode.
-}
-\examples{
-\dontrun{
-# Database mode with counterfactual (using bundled models)
-results <- run_malaria_emulator(
-  db_path = "/path/to/database.duckdb",
-  param_index = 10,
-  predictor = "prevalence",
-  counterfactual = list(eir = c(1, 10, 100))
-)
-
-# Database mode with random parameter (using bundled models)
-results <- run_malaria_emulator(
-  db_path = "/path/to/database.duckdb",
-  predictor = "prevalence"
-)
-
-# Scenario mode (using bundled models)
-scenarios <- create_scenarios(
-  eir = c(5.2, 35.8),
-  dn0_use = c(0.15, 0.35),
-  # ... other parameters
-)
-
-results <- run_malaria_emulator(
-  scenarios = scenarios,
-  predictor = 'prevalence',
-  model_types = c('GRU', 'LSTM')
-)
-
-# Using custom models from a different directory
-results <- run_malaria_emulator(
-  scenarios = scenarios,
-  predictor = 'prevalence',
-  models_base_dir = '/path/to/custom/models',
-  model_types = c('GRU', 'LSTM')
-)
-}
 }
