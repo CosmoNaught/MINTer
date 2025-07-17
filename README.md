@@ -1,14 +1,3 @@
----
-title: "Getting Started with MINTer"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{Getting Started with MINTer}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
----
-
-
-
 ## Introduction
 
 MINTer (Malaria INTervention emulator in R) is an R package that provides fast emulation of malaria transmission models based off malariasimulation (link!). It offers two main workflows:
