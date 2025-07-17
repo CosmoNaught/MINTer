@@ -1,5 +1,5 @@
 Package: MINTer
-Title: Malaria INTervention Emulator Runner
+Title: Malaria INTervention Emulator in R
 Version: 0.1.1
 Authors@R: c(
     person("Cosmo", "Santoni", email = "cosmo.santoni@imperial.ac.uk", 

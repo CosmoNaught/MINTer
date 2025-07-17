@@ -4,7 +4,7 @@
 \name{MINTer-package}
 \alias{MINTer}
 \alias{MINTer-package}
-\title{MINTer: Malaria INTervention Emulator Runner}
+\title{MINTer: Malaria INTervention Emulator in R}
 \description{
 A comprehensive package for malaria intervention simulation and neural network-based emulation. Combines malariasimulation with trained GRU/LSTM models for rapid prediction of intervention outcomes.
 }
