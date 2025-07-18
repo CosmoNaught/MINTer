@@ -2,31 +2,20 @@
 % Please edit documentation in R/plotting.R
 \name{create_scenario_plots}
 \alias{create_scenario_plots}
-\title{Create Scenario Plots (Helper Function)}
+\title{Create Scenario Plots from Emulator Results}
 \usage{
-create_scenario_plots(
-  predictions,
-  models,
-  model_types,
-  window_size = 14,
-  output_dir = NULL
-)
+create_scenario_plots(results, output_dir = NULL, plot_tight = FALSE)
 }
 \arguments{
-\item{predictions}{List of predictions from generate_scenario_predictions}
+\item{results}{Data frame from run_malaria_emulator}
 
-\item{models}{List from load_emulator_models()}
+\item{output_dir}{Directory to save plots (optional)}
 
-\item{model_types}{Vector of model types that were used}
-
-\item{window_size}{Window size for time scaling}
-
-\item{output_dir}{Directory to save plots}
+\item{plot_tight}{Use tight y-axis scaling (default FALSE)}
 }
 \value{
 List of ggplot objects
 }
 \description{
-Create Scenario Plots (Helper Function)
+Creates plots for each scenario from emulator results dataframe.
 }
-\keyword{internal}

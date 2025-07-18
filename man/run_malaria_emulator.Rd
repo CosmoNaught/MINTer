@@ -10,10 +10,8 @@ run_malaria_emulator(
   scenarios = NULL,
   predictor = "prevalence",
   models_base_dir = NULL,
-  output_dir = NULL,
   counterfactual = NULL,
   window_size = 14,
-  plot_tight = FALSE,
   device = NULL,
   model_types = c("GRU", "LSTM"),
   time_steps = 2190
@@ -31,22 +29,18 @@ run_malaria_emulator(
 \item{models_base_dir}{Base directory with trained models. If NULL (default),
 uses models bundled with the package.}
 
-\item{output_dir}{Directory to save outputs (auto-generated if NULL)}
-
 \item{counterfactual}{Named list for counterfactual analysis (database mode only)}
 
 \item{window_size}{Window size for rolling average}
-
-\item{plot_tight}{Use tight y-axis scaling}
 
 \item{device}{"cpu" or "cuda"}
 
 \item{model_types}{Vector of model types to use ("GRU", "LSTM", or both)}
 
-\item{time_steps}{Number of time steps for scenario predictions (in days)}
+\item{time_steps}{Number of time steps for predictions (in days)}
 }
 \value{
-List with results
+Data frame with columns: index, timestep, value, model_type
 }
 \description{
 Runs malaria emulator in either database mode or scenario mode.
