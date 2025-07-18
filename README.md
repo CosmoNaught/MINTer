@@ -69,13 +69,15 @@ intervention_scenarios <- create_scenarios(
   lsm = c(0.05, 0.45, 0.85)
 )
 
-# Run emulator
-results <- MINTer::run_malaria_emulator(
+# Run emulator - returns a dataframe
+results_prevalence <- MINTer::run_malaria_emulator(
   scenarios = scenarios,
-  predictor = 'cases',
-  output_dir = 'scenario_output',
-  model_types = c('GRU', 'LSTM')
+  predictor = 'prevalence',
+  model_types = c('LSTM','GRU')
 )
+
+# Create plots - generates 3 PNGs (one for each scenario)
+plots <- MINTer::create_scenario_plots(results, output_dir = "output/plots")
 ```
 
 ### Option 2: Full Simulation + Database + Emulation
@@ -121,12 +123,12 @@ segMINT::create_database(
 )
 
 # Step 4: Run emulator with counterfactual analysis for your 3rd malariasimulation scenario to explore prevalence changes across a range of EIR values
-MINTer::run_malaria_emulator(
-  db_path = "/path/to/your/working/dir/Data/Database/malariasim_database.duckdb",
+
+results_cases <- MINTer::run_malaria_emulator(
+  db_path = "/home/cosmo/net/malaria/Cosmo/Emulator-Test/Data/Database/malariasim_database.duckdb",
   param_index = 3,
-  predictor = "prevalence",
-  counterfactual = list(eir = c(0.5, 60, 300)),
-  output_dir = "counterfactuals_output"
+  predictor = "cases",
+  counterfactual = list(eir = c(0.5, 60, 300))
 )
 
 ```
