@@ -2,18 +2,16 @@
 % Please edit documentation in R/emulator_main.R
 \name{run_malaria_emulator}
 \alias{run_malaria_emulator}
-\title{Run Malaria Emulator (Unified Version)}
+\title{Run Malaria Emulator}
 \usage{
 run_malaria_emulator(
   db_path = NULL,
   param_index = NULL,
   scenarios = NULL,
   predictor = "prevalence",
-  models_base_dir = ".",
-  output_dir = NULL,
+  models_base_dir = NULL,
   counterfactual = NULL,
   window_size = 14,
-  plot_tight = FALSE,
   device = NULL,
   model_types = c("GRU", "LSTM"),
   time_steps = 2190
@@ -28,55 +26,22 @@ run_malaria_emulator(
 
 \item{predictor}{"prevalence" or "cases"}
 
-\item{models_base_dir}{Base directory with trained models}
-
-\item{output_dir}{Directory to save outputs (auto-generated if NULL)}
+\item{models_base_dir}{Base directory with trained models. If NULL (default),
+uses models bundled with the package.}
 
 \item{counterfactual}{Named list for counterfactual analysis (database mode only)}
 
 \item{window_size}{Window size for rolling average}
 
-\item{plot_tight}{Use tight y-axis scaling}
-
 \item{device}{"cpu" or "cuda"}
 
 \item{model_types}{Vector of model types to use ("GRU", "LSTM", or both)}
 
-\item{time_steps}{Number of time steps for scenario predictions (in days)}
+\item{time_steps}{Number of time steps for predictions (in days)}
 }
 \value{
-List with results
+Data frame with columns: index, timestep, value, model_type
 }
 \description{
 Runs malaria emulator in either database mode or scenario mode.
-}
-\examples{
-\dontrun{
-# Database mode with counterfactual
-results <- run_malaria_emulator(
-  db_path = "/path/to/database.duckdb",
-  param_index = 10,
-  predictor = "prevalence",
-  counterfactual = list(eir = c(1, 10, 100))
-)
-
-# Database mode with random parameter
-results <- run_malaria_emulator(
-  db_path = "/path/to/database.duckdb",
-  predictor = "prevalence"
-)
-
-# Scenario mode
-scenarios <- create_scenarios(
-  eir = c(5.2, 35.8),
-  dn0_use = c(0.15, 0.35),
-  # ... other parameters
-)
-
-results <- run_malaria_emulator(
-  scenarios = scenarios,
-  predictor = 'prevalence',
-  model_types = c('GRU', 'LSTM')
-)
-}
 }

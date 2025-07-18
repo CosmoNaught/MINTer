@@ -15,22 +15,6 @@
 #'
 #' @return A data frame of scenarios
 #' @export
-#'
-#' @examples
-#' scenarios <- create_malarisim_scenarios(
-#'   eir = c(5.2, 35.8),
-#'   dn0_use = c(0.15, 0.35),
-#'   dn0_future = c(0.20, 0.45),
-#'   Q0 = c(0.65, 0.75),
-#'   phi_bednets = c(0.45, 0.65),
-#'   seasonal = c(0, 1),
-#'   routine = c(0, 0),
-#'   itn_use = c(0.25, 0.55),
-#'   irs_use = c(0.10, 0.35),
-#'   itn_future = c(0.30, 0.60),
-#'   irs_future = c(0.15, 0.40),
-#'   lsm = c(0.05, 0.45)
-#' )
 create_malariasim_scenarios <- function(eir, dn0_use, dn0_future, Q0, phi_bednets,
                                 seasonal, routine, itn_use, irs_use,
                                 itn_future, irs_future, lsm) {
@@ -88,7 +72,8 @@ create_malariasim_scenarios <- function(eir, dn0_use, dn0_future, Q0, phi_bednet
 #'
 #' @param max_threads Maximum number of parallel workers to use
 #' @param lhs_scenario Path to LHS scenarios CSV file (default: "Data/malariasim_scenarios.csv")
-#' @param bednet_params_path Path to bednet parameters RDS file
+#' @param bednet_params_path Path to bednet parameters RDS file. If NULL (default),
+#'   uses the bednet parameters bundled with the package.
 #' @param output_dir Directory to save simulation outputs (default: "Data")
 #' @param reps Number of replicates per parameter set (default: 8)
 #' @param human_population Human population size (default: 100000)
@@ -96,22 +81,13 @@ create_malariasim_scenarios <- function(eir, dn0_use, dn0_future, Q0, phi_bednet
 #'
 #' @return A list with simulation results and metadata
 #' @export
-#'
-#' @examples
-#' \dontrun{
-#' results <- run_malariasim(
-#'   max_threads = 12,
-#'   lhs_scenario = "Data/malariasim_scenarios.csv",
-#'   bednet_params_path = "/path/to/bednet_params.RDS"
-#' )
-#' }
 run_malariasim <- function(max_threads = 12,
                           lhs_scenario = "Data/malariasim_scenarios.csv",
-                          bednet_params_path,
-                          output_dir = "Data",
+                          bednet_params_path = NULL,
+                          output_dir = NULL, #"Data"
                           reps = 8,
-                          human_population = 100000,
-                          sim_years = 12) {
+                          human_population = 100000, # DO NOT CHANGE!
+                          sim_years = 12) { # DO NOT CHANGE!
   
   # Set random seed for reproducibility
   set.seed(123)
@@ -120,42 +96,33 @@ run_malariasim <- function(max_threads = 12,
   YEAR <- 365
   SIM_LENGTH <- sim_years * YEAR
   HUMAN_POPULATION <- human_population
-  
-  # Dependency check & auto-install
-  required_packages <- c(
-    "future",          # parallel backend
-    "future.apply",    # future-aware lapply / map
-    "progressr",       # granular, cross-process progress bars
-    "data.table",      # fast I/O
-    "malariasimulation", # the modeller itself
-    "dplyr"            # misc helpers
-  )
-  
-  missing <- required_packages[!vapply(required_packages,
-                                       requireNamespace,
-                                       logical(1), quietly = TRUE)]
-  if (length(missing)) {
-    message("Installing missing dependencies: ", paste(missing, collapse = ", "))
-    install.packages(missing, repos = "https://cloud.r-project.org")
-  }
-  
-  # Load libraries
-  suppressPackageStartupMessages({
-    require(data.table)
-    require(future)
-    require(future.apply)
-    require(progressr)
-    require(malariasimulation)
-    require(dplyr)
-  })
-  
+
   # Enable progress bars
   progressr::handlers(global = TRUE)
   
   # Helper function for safe core count
   safe_ncores <- function(requested) {
-    avail <- parallel::detectCores(logical = FALSE)  # physical cores only
+    avail <- parallel::detectCores(logical = FALSE)
     max(1L, min(requested, max_threads, avail))
+  }
+  
+  # Handle bednet parameters path
+  if (is.null(bednet_params_path)) {
+    # Use bundled bednet parameters
+    bednet_params_path <- system.file("extdata", "bednet_params_raw.RDS", package = "MINTer")
+    
+    # If not found in installed package, check development directory
+    if (bednet_params_path == "" || !file.exists(bednet_params_path)) {
+      if (file.exists("inst/extdata/bednet_params_raw.RDS")) {
+        bednet_params_path <- "inst/extdata/bednet_params_raw.RDS"
+        message("[INFO] Using bednet parameters from development directory")
+      } else {
+        stop("Could not find bundled bednet parameters. Please ensure MINTer is properly installed ",
+             "with bednet_params_raw.RDS, or specify a custom path with bednet_params_path parameter.")
+      }
+    } else {
+      message("[INFO] Using bundled bednet parameters")
+    }
   }
   
   # Load input data
@@ -193,7 +160,7 @@ run_malariasim <- function(max_threads = 12,
   job_grid <- expand.grid(set = seq_len(param_index),
                          rep = seq_len(reps))
   num_jobs <- nrow(job_grid)
-  total_ticks <- num_jobs * 2   # start + finish for each replicate
+  total_ticks <- num_jobs * 2 
   
   # Main parallel execution with progress
   message("Running simulations...\n")
@@ -207,7 +174,6 @@ run_malariasim <- function(max_threads = 12,
       
       param_item <- param_list[[i]]
       
-      # tick 1: job started
       p(message = sprintf("set %d / rep %d — started", i, j))
       
       # Run a single replicate
@@ -216,12 +182,12 @@ run_malariasim <- function(max_threads = 12,
           param_item$timesteps,
           param_item$parameters
         )
-        result  # Return just the result directly
+        result
       }, error = function(e) {
         structure(list(message = e$message), class = "simulation_error")
       })
       
-      # tick 2: job finished
+
       p(message = sprintf("set %d / rep %d — done", i, j))
       
       list(set = i, rep = j, result = res,
@@ -234,7 +200,6 @@ run_malariasim <- function(max_threads = 12,
     dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
   }
   
-  # Organize & save per-set outputs in the expected format
   results <- vector("list", param_index)
   failed  <- data.frame(parameter_set = numeric(0), rep = numeric(0))
   
@@ -242,12 +207,10 @@ run_malariasim <- function(max_threads = 12,
     subset_rows <- vapply(job_results, function(x) x$set == i, logical(1))
     replica_objs <- job_results[subset_rows]
     
-    # Extract just the results (not wrapped in another list)
+    # Extract just the results
     repl_results <- lapply(replica_objs, `[[`, "result")
     failed_reps  <- which(!vapply(replica_objs, `[[`, logical(1), "success"))
     
-    # MODIFIED: Save in the format expected by create_database
-    # This matches the format from Script 1
     file_path <- file.path(output_dir, sprintf("simulation_results_%d.rds", i))
     saveRDS(list(input = param_list[[i]], outputs = repl_results), file = file_path)
     
@@ -320,16 +283,15 @@ local_cluster_malariasim_controller <- function(input, reps) {
       input$timesteps,
       input$parameters
     )
-    return(result)  # Return just the result directly
+    return(result)
   }
   
   results <- parallel::parLapply(cl, seq_len(reps), task_fun, input = input)
   
-  # MODIFIED: Return in the format expected by create_database
   output <- list()
   output$input <- input
   output$input$parameters <- NULL
-  output$outputs <- results  # List of results directly
+  output$outputs <- results
   
   return(output)
 }

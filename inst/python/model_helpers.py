@@ -63,8 +63,13 @@ class LSTMModel(nn.Module):
 def predict_full_sequence(model, full_ts, device):
     model.eval()
     with torch.no_grad():
-        with autocast(device_type='cuda' if device.type == 'cuda' else 'cpu'):
-            x_torch = torch.tensor(full_ts, dtype=torch.float32).unsqueeze(1).to(device)
+        x_torch = torch.tensor(full_ts, dtype=torch.float32).unsqueeze(1).to(device)
+        
+        if device.type == 'cuda':
+            with autocast(device_type='cuda'):
+                pred = model(x_torch).squeeze(-1).squeeze(-1).cpu().numpy()
+        else:
+            # No autocast for CPU
             pred = model(x_torch).squeeze(-1).squeeze(-1).cpu().numpy()
     return pred
 

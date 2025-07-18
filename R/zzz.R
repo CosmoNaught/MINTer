@@ -1,131 +1,61 @@
-# # zzz.R  ────────────────────────────────────────────────────────────────────────
-# .onLoad <- function(libname, pkgname) {
-#   ns <- asNamespace(pkgname)
-#   packageStartupMessage("MINTer: Malaria INTervention Emulator Runner")
-
-#   ## ------------------------------------------------------------------
-#   ## 1.  Tell reticulate which Python to use, falling back to system
-#   ## ------------------------------------------------------------------
-#   py_exec <- Sys.getenv("RETICULATE_PYTHON", unset = Sys.which("python3"))
-#   if (nzchar(py_exec))
-#     try(reticulate::use_python(py_exec, required = FALSE), silent = TRUE)
-
-#   ## ------------------------------------------------------------------
-#   ## 2.  Check for required modules (but never abort install)
-#   ## ------------------------------------------------------------------
-#   required <- c("numpy", "torch", "pandas")
-
-#   for (pkg in required) {
-#     ok <- tryCatch(reticulate::py_module_available(pkg), error = function(e) FALSE)
-#     if (!ok) {
-#       packageStartupMessage(
-#         sprintf("Missing Python module '%s'. Install with:\n  reticulate::py_install('%s')",
-#                 pkg, pkg)
-#       )
-#     }
-#   }
-
-#   ## ------------------------------------------------------------------
-#   ## 3.  Active bindings so `torch`, `np`, `pd` work in R
-#   ## ------------------------------------------------------------------
-#   makeAB <- function(sym, mod) makeActiveBinding(
-#     sym, function() reticulate::import(mod, delay_load = FALSE), ns
-#   )
-#   makeAB("np",    "numpy")
-#   makeAB("torch", "torch")
-#   makeAB("pd",    "pandas")
-# }
-
-# #' Initialise (or re-initialise) Python dependencies
-# #' @export
-# initialize_python <- function() {
-#   required <- c("numpy", "torch", "pandas")
-#   missing <- required[!vapply(required, reticulate::py_module_available, logical(1))]
-#   if (length(missing))
-#     stop("Missing Python modules: ", paste(missing, collapse = ", "),
-#          "\nInstall with reticulate::py_install().", call. = FALSE)
-
-#   invisible(lapply(required, reticulate::import, delay_load = FALSE))
-#   message("Python dependencies initialised.")
-#   TRUE
-# }
-# Package startup functions
-
-# Python modules (loaded on demand)
 np <- NULL
 torch <- NULL
 pd <- NULL
 
 .onLoad <- function(libname, pkgname) {
-  # Configure reticulate to use a specific Python environment if needed
-  # reticulate::use_python("/usr/bin/python3", required = FALSE)
+
+  reticulate::configure_environment(pkgname)
   
-  # Message about Python dependencies
-  packageStartupMessage("MINTer: Malaria INTervention Emulator and Runner")
-  packageStartupMessage("Note: Python dependencies (numpy, torch, pandas) will be loaded when needed.")
+  # Declare Python dependencies using py_require
+  # This creates a manifest but doesn't install anything yet
+  # Only when these modules are first used will they be installed
+  reticulate::py_require("numpy")
+  reticulate::py_require("pandas")
+  reticulate::py_require("torch")
+  reticulate::py_require("scikit-learn")
   
-  # Initialize Python modules on first use
-  delay_load_python()
+  # Import with delayed loading
+  assign("np", reticulate::import("numpy", delay_load = TRUE), envir = parent.env(environment()))
+  assign("torch", reticulate::import("torch", delay_load = TRUE), envir = parent.env(environment()))
+  assign("pd", reticulate::import("pandas", delay_load = TRUE), envir = parent.env(environment()))
 }
 
 #' Initialize Python Dependencies
 #'
-#' This function initializes the Python dependencies required for the emulator.
-#' It is called automatically when needed, but can be called manually to 
+#' This function initialises the Python dependencies required for the emulator.
+#' It is called automatically when needed, but can be called manually to
 #' pre-load the dependencies.
 #'
+#' @param verbose Logical, whether to print messages (default: TRUE)
 #' @export
-initialize_python <- function() {
-  # Check if already initialized
+initialize_python <- function(verbose = TRUE) {
+  # First ensure Python is available (this will trigger initialization if needed)
+  if (!reticulate::py_available(initialize = TRUE)) {
+    stop("Python is not available. Please install Python and required packages.")
+  }
+  
+  # Force Python initialization by accessing a module (numpy is the most robust using this!!!!)
+  # This triggers the delayed load and installs packages if needed
+  np_module <- np  # This accesses the delay-loaded numpy module
+  
   if (reticulate::py_has_attr(reticulate::py, "load_model_from_checkpoint")) {
-    message("Python dependencies already initialized.")
+    if (verbose) message("Python dependencies already initialized.")
     return(invisible(TRUE))
   }
   
-  if (!reticulate::py_module_available("numpy")) {
-    stop("Python module 'numpy' is required. Please install it using:\n",
-         "reticulate::py_install('numpy')")
-  }
-  
-  if (!reticulate::py_module_available("torch")) {
-    stop("Python module 'torch' is required. Please install it using:\n",
-         "reticulate::py_install('torch')")
-  }
-  
-  if (!reticulate::py_module_available("pandas")) {
-    stop("Python module 'pandas' is required. Please install it using:\n",
-         "reticulate::py_install('pandas')")
-  }
-  
-  # Import Python modules
-  np <<- reticulate::import("numpy", delay_load = FALSE)
-  torch <<- reticulate::import("torch", delay_load = FALSE)
-  pd <<- reticulate::import("pandas", delay_load = FALSE)
-  
   # Source Python helper functions
   python_script <- system.file("python", "model_helpers.py", package = "MINTer")
+  
+  # Development mode fallback ONLY
+  if (python_script == "" && file.exists("inst/python/model_helpers.py")) {
+    python_script <- "inst/python/model_helpers.py"
+  }
+  
   if (!file.exists(python_script)) {
     stop("Could not find model_helpers.py. Please ensure MINTer is properly installed.")
   }
-  reticulate::source_python(python_script)
   
-  message("Python dependencies initialized successfully.")
+  reticulate::source_python(python_script)
+  if (verbose) message("Python dependencies initialized successfully.")
   invisible(TRUE)
-}
-
-#' Delay Load Python Modules
-#'
-#' Sets up delayed loading of Python modules to avoid loading them
-#' until they are actually needed.
-#'
-#' @keywords internal
-delay_load_python <- function() {
-  np <<- reticulate::import("numpy", delay_load = TRUE)
-  torch <<- reticulate::import("torch", delay_load = TRUE)
-  pd <<- reticulate::import("pandas", delay_load = TRUE)
-}
-
-.onAttach <- function(libname, pkgname) {
-  # Optional: Display a message when the package is attached
-  # packageStartupMessage("Type ?MINTer for package documentation.")
 }

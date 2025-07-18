@@ -7,8 +7,8 @@
 run_malariasim(
   max_threads = 12,
   lhs_scenario = "Data/malariasim_scenarios.csv",
-  bednet_params_path,
-  output_dir = "Data",
+  bednet_params_path = NULL,
+  output_dir = NULL,
   reps = 8,
   human_population = 1e+05,
   sim_years = 12
@@ -19,7 +19,8 @@ run_malariasim(
 
 \item{lhs_scenario}{Path to LHS scenarios CSV file (default: "Data/malariasim_scenarios.csv")}
 
-\item{bednet_params_path}{Path to bednet parameters RDS file}
+\item{bednet_params_path}{Path to bednet parameters RDS file. If NULL (default),
+uses the bednet parameters bundled with the package.}
 
 \item{output_dir}{Directory to save simulation outputs (default: "Data")}
 
@@ -35,13 +36,4 @@ A list with simulation results and metadata
 \description{
 Run malaria simulations for all parameter sets in the LHS scenarios file.
 This function handles dependency checking, parallel processing, and progress tracking.
-}
-\examples{
-\dontrun{
-results <- run_malariasim(
-  max_threads = 12,
-  lhs_scenario = "Data/malariasim_scenarios.csv",
-  bednet_params_path = "/path/to/bednet_params.RDS"
-)
-}
 }
