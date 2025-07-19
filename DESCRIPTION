@@ -1,6 +1,6 @@
 Package: MINTer
 Title: Malaria INTervention Emulator in R
-Version: 0.1.1
+Version: 0.2.0
 Authors@R: c(
     person("Cosmo", "Santoni", email = "cosmo.santoni@imperial.ac.uk", 
            role = c("aut", "cre")))
@@ -13,23 +13,30 @@ LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Depends: 
-    R (>= 4.0.0)
+    R (>= 4.1.0)
 Imports:
-    reticulate (>= 1.30),
+    reticulate (>= 1.41),
     DBI,
     duckdb,
-    tidyverse,
     ggplot2,
     jsonlite,
     malariasimulation,
+    malariaEquilibrium,
+    malariaEquilibriumVivax,
     data.table,
     future,
     future.apply,
     progressr,
-    dplyr
+    dplyr,
+    rlang,
+    cli
 Suggests:
     testthat (>= 3.0.0),
     knitr,
     rmarkdown
+Remotes:
+    mrc-ide/malariasimulation,
+    mrc-ide/malariaEquilibrium,
+    mrc-ide/malariaEquilibriumVivax
 Config/testthat/edition: 3
 VignetteBuilder: knitr

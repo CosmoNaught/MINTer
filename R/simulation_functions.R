@@ -16,8 +16,8 @@
 #' @return A data frame of scenarios
 #' @export
 create_malariasim_scenarios <- function(eir, dn0_use, dn0_future, Q0, phi_bednets,
-                                seasonal, routine, itn_use, irs_use,
-                                itn_future, irs_future, lsm) {
+                                        seasonal, routine, itn_use, irs_use,
+                                        itn_future, irs_future, lsm) {
   
   # Check that all vectors have the same length
   vector_lengths <- c(
@@ -55,7 +55,7 @@ create_malariasim_scenarios <- function(eir, dn0_use, dn0_future, Q0, phi_bednet
   }
   
   # Write to CSV file
-  write.csv(scenarios, file = "Data/malariasim_scenarios.csv", row.names = FALSE)
+  utils::write.csv(scenarios, file = "Data/malariasim_scenarios.csv", row.names = FALSE)
   
   # Print summary information
   message("Created ", nrow(scenarios), " scenarios in Data/malariasim_scenarios.csv")
@@ -82,12 +82,12 @@ create_malariasim_scenarios <- function(eir, dn0_use, dn0_future, Q0, phi_bednet
 #' @return A list with simulation results and metadata
 #' @export
 run_malariasim <- function(max_threads = 12,
-                          lhs_scenario = "Data/malariasim_scenarios.csv",
-                          bednet_params_path = NULL,
-                          output_dir = NULL, #"Data"
-                          reps = 8,
-                          human_population = 100000, # DO NOT CHANGE!
-                          sim_years = 12) { # DO NOT CHANGE!
+                           lhs_scenario = "Data/malariasim_scenarios.csv",
+                           bednet_params_path = NULL,
+                           output_dir = NULL, #"Data"
+                           reps = 8,
+                           human_population = 100000, # DO NOT CHANGE!
+                           sim_years = 12) { # DO NOT CHANGE!
   
   # Set random seed for reproducibility
   set.seed(123)
@@ -96,7 +96,7 @@ run_malariasim <- function(max_threads = 12,
   YEAR <- 365
   SIM_LENGTH <- sim_years * YEAR
   HUMAN_POPULATION <- human_population
-
+  
   # Enable progress bars
   progressr::handlers(global = TRUE)
   
@@ -126,13 +126,13 @@ run_malariasim <- function(max_threads = 12,
   }
   
   # Load input data
-  message("Loading bednet parameters…\n")
+  message("Loading bednet parameters...\n")
   if (!file.exists(bednet_params_path)) {
     stop("Bednet parameters file not found: ", bednet_params_path)
   }
   bednet_params <- readRDS(bednet_params_path)
   
-  message("Loading malariasim scenarios…\n")
+  message("Loading malariasim scenarios...\n")
   if (!file.exists(lhs_scenario)) {
     stop("LHS scenarios file not found: ", lhs_scenario)
   }
@@ -142,23 +142,23 @@ run_malariasim <- function(max_threads = 12,
   message(sprintf("Parameter sets: %d | Replicates: %d\n", param_index, reps))
   
   # Build parameter list
-  message("Generating parameters…\n")
-  progress_param <- txtProgressBar(min = 0, max = param_index, style = 3)
+  message("Generating parameters...\n")
+  progress_param <- utils::txtProgressBar(min = 0, max = param_index, style = 3)
   param_list <- lapply(seq_len(param_index), function(ps) {
-    setTxtProgressBar(progress_param, ps)
+    utils::setTxtProgressBar(progress_param, ps)
     get_runtime_parameters(ps, lhs_data, HUMAN_POPULATION,
-                          bednet_params, SIM_LENGTH)
+                           bednet_params, SIM_LENGTH)
   })
   close(progress_param)
   message("\n")
   
   # Set up parallel processing
   workers_total <- safe_ncores(max_threads)
-  future::plan(multisession, workers = workers_total)
+  future::plan(future::multisession, workers = workers_total)
   
   # Create job grid
   job_grid <- expand.grid(set = seq_len(param_index),
-                         rep = seq_len(reps))
+                          rep = seq_len(reps))
   num_jobs <- nrow(job_grid)
   total_ticks <- num_jobs * 2 
   
@@ -174,7 +174,7 @@ run_malariasim <- function(max_threads = 12,
       
       param_item <- param_list[[i]]
       
-      p(message = sprintf("set %d / rep %d — started", i, j))
+      p(message = sprintf("set %d / rep %d - started", i, j))
       
       # Run a single replicate
       res <- tryCatch({
@@ -187,8 +187,8 @@ run_malariasim <- function(max_threads = 12,
         structure(list(message = e$message), class = "simulation_error")
       })
       
-
-      p(message = sprintf("set %d / rep %d — done", i, j))
+      
+      p(message = sprintf("set %d / rep %d - done", i, j))
       
       list(set = i, rep = j, result = res,
            success = !inherits(res, "simulation_error"))
@@ -222,25 +222,28 @@ run_malariasim <- function(max_threads = 12,
     )
     
     if (length(failed_reps)) {
-      failed <- rbind(failed,
-                      data.frame(parameter_set = i,
-                                rep           = failed_reps))
+      failed <- rbind(
+        failed,
+        data.frame(parameter_set = i,
+                   rep = failed_reps)
+      )
     }
   }
   
   # Summary output
   for (res in results) {
     if (res$status == "success") {
-      message(sprintf("✓ set %d finished → %s", res$parameter_set, res$filename))
+      cli::cli_alert_success("Set {res$parameter_set} finished: {res$filename}")
     } else {
-      message(sprintf("⚠ set %d finished with %d failed rep(s) → %s",
-                     res$parameter_set, length(res$failed_reps), res$filename))
+      cli::cli_alert_warning(
+        "Set {res$parameter_set} finished with {length(res$failed_reps)} failed reps: {res$filename}"
+      )
     }
   }
   
   # Save failed runs info
   if (nrow(failed) > 0) {
-    write.csv(failed, file.path(output_dir, "failed.csv"), row.names = FALSE)
+    utils::write.csv(failed, file.path(output_dir, "failed.csv"), row.names = FALSE)
   }
   
   message("\nSimulation complete!")
@@ -323,7 +326,7 @@ local_malariasim_controller <- function(input, reps) {
     })
   })
   
-
+  
   output <- list()
   output$input <- input
   output$input$parameters <- NULL

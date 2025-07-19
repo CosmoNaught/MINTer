@@ -66,19 +66,7 @@ set_bednet_parameters <- function(simparams, lhs_sample, bednet_params, baseline
   }
   
   # Generate number of nets to be distributed at each distribution event
-  fetch_nets_distributed <- function() {
-    
-    # Historic and future mass campaign timings
-    historic_mass_campaigns <<- fetch_mass_campaign_times(
-      first_year = first_historic_campaign,
-      final_year = last_historic_campaign,
-      interval = historic_campaign_interval
-    )
-    future_mass_campaigns <<- fetch_mass_campaign_times(
-      first_year = first_future_campaign,
-      final_year = last_future_campaign,
-      interval = future_campaign_interval
-    )
+  fetch_nets_distributed <- function(historic_mass_campaigns, future_mass_campaigns) {
     
     # Calculate routine top-ups
     if (historic_routine) {
@@ -195,6 +183,18 @@ set_bednet_parameters <- function(simparams, lhs_sample, bednet_params, baseline
   rnm_future <- 0.24
   gamman_future <- selected_net_params_future$gamman
   
+  # Historic and future mass campaign timings
+  historic_mass_campaigns <- fetch_mass_campaign_times(
+    first_year = first_historic_campaign,
+    final_year = last_historic_campaign,
+    interval = historic_campaign_interval
+  )
+  future_mass_campaigns <- fetch_mass_campaign_times(
+    first_year = first_future_campaign,
+    final_year = last_future_campaign,
+    interval = future_campaign_interval
+  )
+  
   #-----------------------------------------------------------------------------
   # Calculate dependent parameters
   
@@ -216,7 +216,7 @@ set_bednet_parameters <- function(simparams, lhs_sample, bednet_params, baseline
   
   net_times <- fetch_net_distribution_times()
   N_dist <- length(net_times)
-  nets_distributed <- fetch_nets_distributed()
+  nets_distributed <- fetch_nets_distributed(historic_mass_campaigns, future_mass_campaigns)
   N_historic_dist <- which(net_times == future_mass_campaigns[1]) - 1
   N_future_dist <- N_dist - N_historic_dist
   

@@ -51,7 +51,7 @@ create_scenario_plots <- function(results, output_dir = NULL, plot_tight = FALSE
   if (!is.null(mode) && mode == "database") {
     # Filter to reasonable timesteps
     MAX_STEPS <- 156
-    results <- dplyr::filter(results, timestep <= MAX_STEPS)
+    results <- dplyr::filter(results, .data$timestep <= MAX_STEPS)
     
     # Prepare plot data
     plot_df <- data.frame(
@@ -162,17 +162,17 @@ create_unified_plot <- function(plot_data, predictor, title_text,
                                window_size = 14, plot_tight = FALSE) {
   MAX_STEPS <- 156
   # Convert timesteps to years
-  plot_data <- dplyr::filter(plot_data, timestep <= MAX_STEPS)
+  plot_data <- dplyr::filter(plot_data, .data$timestep <= MAX_STEPS)
   
   # Every timestep represents `window_size` days, no matter which predictor
   plot_data$years <- (plot_data$timestep * window_size) / 365
   
   # Create plot
-  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = years, y = value, color = type)) +
+  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data$years, y = .data$value, color = .data$type)) +
     ggplot2::geom_vline(xintercept = 3, linetype = "dashed", color = "black", alpha = 0.5) +
-    ggplot2::geom_line(data = dplyr::filter(plot_data, type == "Actual"), 
-              ggplot2::aes(group = simulation), alpha = 0.5, linetype = "dashed") +
-    ggplot2::geom_line(data = dplyr::filter(plot_data, type != "Actual"), 
+    ggplot2::geom_line(data = dplyr::filter(plot_data, .data$type == "Actual"), 
+              ggplot2::aes(group = .data$simulation), alpha = 0.5, linetype = "dashed") +
+    ggplot2::geom_line(data = dplyr::filter(plot_data, .data$type != "Actual"), 
               linewidth = 1.2) +
     ggplot2::scale_x_continuous(
       breaks = 0:6,

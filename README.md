@@ -54,7 +54,7 @@ library(MINTer)
 # Create scenarios
 
 # Create intervention scenarios
-intervention_scenarios <- create_scenarios(
+scenarios <- create_scenarios(
   eir = c(5.2, 35.8, 180.5),
   dn0_use = c(0.15, 0.35, 0.55),
   dn0_future = c(0.20, 0.45, 0.65),
@@ -70,7 +70,7 @@ intervention_scenarios <- create_scenarios(
 )
 
 # Run emulator - returns a dataframe
-results_prevalence <- MINTer::run_malaria_emulator(
+results <- MINTer::run_malaria_emulator(
   scenarios = scenarios,
   predictor = 'prevalence',
   model_types = c('LSTM','GRU')
