@@ -21,6 +21,8 @@ Imports:
     ggplot2,
     jsonlite,
     malariasimulation,
+    malariaEquilibrium,
+    malariaEquilibriumVivax,
     data.table,
     future,
     future.apply,
@@ -33,6 +35,8 @@ Suggests:
     knitr,
     rmarkdown
 Remotes:
-    mrc-ide/malariasimulation
+    mrc-ide/malariasimulation,
+    mrc-ide/malariaEquilibrium,
+    mrc-ide/malariaEquilibriumVivax
 Config/testthat/edition: 3
 VignetteBuilder: knitr
