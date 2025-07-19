@@ -69,12 +69,12 @@ set_bednet_parameters <- function(simparams, lhs_sample, bednet_params, baseline
   fetch_nets_distributed <- function() {
     
     # Historic and future mass campaign timings
-    historic_mass_campaigns <<- fetch_mass_campaign_times(
+    historic_mass_campaigns <- fetch_mass_campaign_times(
       first_year = first_historic_campaign,
       final_year = last_historic_campaign,
       interval = historic_campaign_interval
     )
-    future_mass_campaigns <<- fetch_mass_campaign_times(
+    future_mass_campaigns <- fetch_mass_campaign_times(
       first_year = first_future_campaign,
       final_year = last_future_campaign,
       interval = future_campaign_interval
