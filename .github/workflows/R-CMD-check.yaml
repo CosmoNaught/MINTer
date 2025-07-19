@@ -46,16 +46,10 @@ jobs:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
-          
-      - name: Install dependencies via remotes
-        run: |
-          install.packages("remotes")
-          remotes::install_deps(dependencies = TRUE, upgrade = "always")
-        shell: Rscript {0}
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rcmdcheck
+          extra-packages: github::mrc-ide/malariaEquilibrium, github::mrc-ide/malariaEquilibriumVivax, any::rcmdcheck
           needs: check
 
       - uses: r-lib/actions/check-r-package@v2
