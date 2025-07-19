@@ -10,7 +10,17 @@ library(testthat)
 library(MINTer)
 
 # set once here to get threads set up right for mac
-mac_thread_safe_setup()
+if (all(unlist(lapply(pkgs, reticulate::py_module_available)))) {
+  if (Sys.info()[["sysname"]] == "Darwin") {
+    reticulate::py_run_string("
+import torch
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+")
+    message("[INFO] PyTorch threads set to 1 for macOS stability.")
+  }
+  
+}
 
 # then check
 test_check("MINTer")
