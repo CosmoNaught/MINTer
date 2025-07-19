@@ -1,5 +1,3 @@
-context("emulator calls")
-
 test_that("scenarios run", {
   
   skip_if_no_python_pkgs()

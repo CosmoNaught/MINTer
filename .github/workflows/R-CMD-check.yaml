@@ -30,6 +30,13 @@ jobs:
       R_KEEP_PKG_SOURCE: yes
 
     steps:
+    
+        # Pinning UV due to https://github.com/rstudio/reticulate/issues/1811
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.7.22"
+    
       - uses: actions/checkout@v4
 
       - uses: r-lib/actions/setup-pandoc@v2
