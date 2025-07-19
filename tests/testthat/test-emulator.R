@@ -1,7 +1,6 @@
 test_that("prevalence scenarios run", {
   
   skip_if_no_python_pkgs()
-  mac_thread_safe_setup()
   testthat::skip_on_cran()
   
   # Create intervention scenarios
@@ -38,7 +37,6 @@ test_that("prevalence scenarios run", {
 test_that("cases scenarios run", {
   
   skip_if_no_python_pkgs()
-  mac_thread_safe_setup()
   testthat::skip_on_cran()
   
   # Create intervention scenarios

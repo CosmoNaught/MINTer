@@ -9,4 +9,8 @@
 library(testthat)
 library(MINTer)
 
+# set once here to get threads set up right for mac
+mac_thread_safe_setup()
+
+# then check
 test_check("MINTer")
