@@ -13,5 +13,6 @@
 #' @importFrom future plan
 #' @importFrom future.apply future_lapply
 #' @importFrom progressr progressor handlers with_progress
+#' @importFrom rlang .data
 ## usethis namespace: end
 NULL

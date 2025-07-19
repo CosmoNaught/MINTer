@@ -388,7 +388,7 @@ run_emulator <- function(db_path,
     
     # Save predictions
     pred_df <- dplyr::bind_rows(all_predictions)
-    write.csv(pred_df, file.path(output_dir, 
+    utils::write.csv(pred_df, file.path(output_dir, 
                                 sprintf("%s_parameter_%d_global_%d_predictions.csv",
                                        models$predictor, param_index, global_index)))
     
