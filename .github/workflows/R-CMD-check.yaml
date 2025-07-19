@@ -48,10 +48,10 @@ jobs:
           use-public-rspm: true
           
       - name: Install dependencies via remotes
-          run: |
-            install.packages("remotes")
-            remotes::install_deps(dependencies = TRUE, upgrade = "always")
-          shell: Rscript {0}
+        run: |
+          install.packages("remotes")
+          remotes::install_deps(dependencies = TRUE, upgrade = "always")
+        shell: Rscript {0}
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
