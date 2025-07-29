@@ -4,7 +4,7 @@
 #' @export
 available_net_types <- function(itn_params_path = NULL) {
   if (is.null(itn_params_path)) {
-    itn_params_path <- system.file("extdata", "itn_dn0.RDS", package = "MINTer")
+    itn_params_path <- system.file("extdata", "itn_dn0.rds", package = "MINTer")
   }
   stopifnot(file.exists(itn_params_path))
   unique(readRDS(itn_params_path)$net_type)
@@ -22,7 +22,7 @@ define_bednet_types <- function(net_types,
                                 strict = FALSE) {
 
   if (is.null(itn_params_path)) {
-    itn_params_path <- system.file("extdata", "itn_dn0.RDS", package = "MINTer")
+    itn_params_path <- system.file("extdata", "itn_dn0.rds", package = "MINTer")
   }
   if (!file.exists(itn_params_path)) {
     stop("ITN‑parameter file not found: ", itn_params_path)
