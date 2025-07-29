@@ -1,7 +1,8 @@
 #' Calculate overall dn0 in a single call
 #'
-#' Supply the net‑type usage mix as named arguments and get the weighted
-#' average **dn0** at the requested resistance level.
+#' Supply the net‑type usage mix as named arguments and get  
+#'   * **dn0** – the weighted‐average dn0 at the requested resistance level, and  
+#'   * **itn_use** – the total usage proportion of pyrethroid‑based ITNs.  
 #'
 #' @param resistance_level Numeric resistance level.
 #' @param ...              Named numeric values giving the usage proportion for
@@ -13,7 +14,12 @@
 #'                         missing from the parameter file (even after the
 #'                         initial name check).
 #'
-#' @return A numeric scalar (overall dn0).
+#' @return A list with two elements
+#' \describe{
+#'   \item{dn0}{Numeric scalar – overall dn0.}
+#'   \item{itn_use}{Numeric scalar – sum of the usage proportions whose names
+#'                 start with `"pyrethroid"`.}
+#' }
 #' @export
 calculate_overall_dn0 <- function(resistance_level,
                                   ...,
@@ -43,7 +49,17 @@ calculate_overall_dn0 <- function(resistance_level,
                                  itn_params_path = itn_params_path,
                                  strict = strict)
 
-  resistance_to_overall_dn0(splines,
-                            usage_values,
-                            resistance_level)
+  dn0_val  <- resistance_to_overall_dn0(splines,
+                                        usage_values,
+                                        resistance_level)
+
+  itn_use_val <- sum(
+    usage_values[grepl("^pyrethroid", names(usage_values), ignore.case = TRUE)],
+    na.rm = TRUE
+  )
+
+  list(
+    dn0     = dn0_val,
+    itn_use = itn_use_val
+  )
 }
