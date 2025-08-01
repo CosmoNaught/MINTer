@@ -1,6 +1,6 @@
 Package: MINTer
 Title: Malaria INTervention Emulator in R
-Version: 0.2.0
+Version: 0.3.0
 Authors@R: c(
     person("Cosmo", "Santoni", email = "cosmo.santoni@imperial.ac.uk", 
            role = c("aut", "cre")))
@@ -37,6 +37,7 @@ Suggests:
 Remotes:
     mrc-ide/malariasimulation,
     mrc-ide/malariaEquilibrium,
-    mrc-ide/malariaEquilibriumVivax
+    mrc-ide/malariaEquilibriumVivax,
+    CosmoNaught/estiMINT
 Config/testthat/edition: 3
 VignetteBuilder: knitr

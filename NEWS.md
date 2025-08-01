@@ -1,3 +1,7 @@
+# `MINTer` 0.3.0
+
+*Improved user end experience by introducing single function callpoint
+
 # `MINTer` 0.2.0
 
 * Working release with GHA CI 

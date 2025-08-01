@@ -116,100 +116,87 @@ cases <- run_malaria_emulator(
 
 ## 🔌 New: Prevalence‑Driven Workflows with **estiMINT**
 
-Field surveys usually measure *parasite prevalence*, not EIR. Thus users will not likely have access to EIR readings to interface with MINTe natively.  **estiMINT** bridges that gap by converting prevalence + entomological context straight into starting‑EIR values that MINTer understands.
+Field surveys usually measure *parasite prevalence*, not EIR. Thus users will not likely have access to EIR readings to interface with MINTer natively. **estiMINT** bridges that gap by converting prevalence + entomological context straight into starting‑EIR values that MINTer understands.
 
 ### End‑to‑End Example
 
 ```r
 library(MINTer)
-library(estiMINT)
 
 ###############################################################################
 # 1.  Input your bed‑net mix & context                                   🔧
 ###############################################################################
-res_use        <- c(0.30, 0.45, 0.20)   # current pyrethroid resistance
-res_future     <- c(0.60, 0.75, 0.50)   # resistance after next campaign
-
-# proportion of each long‑lasting net type in circulation (must sum to ≤1)
-py_only   <- c(0.40, 0.30, 0.50)
-py_pbo    <- c(0.10, 0.15, 0.05)
-py_pyrrole<- c(0.00, 0.05, 0.00)
-py_ppf    <- c(0.10, 0.10, 0.15)
-
-prev_vec  <- c(0.20, 0.40, 0.60)   # measured PfPR2‑10
-Q0_vec    <- c(0.65, 0.75, 0.85)   # anthropophagy
-phi_vec   <- c(0.45, 0.65, 0.75)   # proportion bites in bed
-season_vec<- c(0, 1, 1)            # perennial vs seasonal
-routine_vec <- c(0, 0, 1)          # routine ITN distribution?
-irs_vec   <- c(0.10, 0.35, 0.70)   # IRS now
-irs_future_vec <- c(0.20, 0.40, 0.50) # IRS after campaign
-lsm_vec   <- c(0.05, 0.45, 0.85)   # LSM coverage
-
-###############################################################################
-# 2.  One‑off: load the pretrained prevalence→EIR models                 
-###############################################################################
-pretrained <- estiMINT::load_pretrained_eir_models()
-
-###############################################################################
-# 3.  Helper to run *one* composite scenario                              
-###############################################################################
-run_scenario <- function(i) {
-
-  # (a) Net performance today & after campaign
-  net_now  <- calculate_overall_dn0(res_use[i],  py_only[i], py_pbo[i],
-                                    py_pyrrole[i], py_ppf[i])
-  net_next <- calculate_overall_dn0(res_future[i], py_only[i], py_pbo[i],
-                                    py_pyrrole[i], py_ppf[i])
-
-  # (b) Estimate starting EIR for each prevalence point
-  runtime <- data.frame(prevalence  = prev_vec,
-                        dn0_use     = net_now$dn0,
-                        Q0          = Q0_vec,
-                        phi_bednets = phi_vec,
-                        seasonal    = season_vec,
-                        routine     = routine_vec,
-                        itn_use     = net_now$itn_use,
-                        irs_use     = irs_vec)
-
-  eir <- rowMeans(cbind(
-    estiMINT::predict_initial_eir(pretrained$xgboost, runtime, pretrained$feature_cols),
-    estiMINT::predict_initial_eir(pretrained$rf_model, runtime, pretrained$feature_cols)))
-
-  # (c) Build emulator scenarios
-  scen <- create_scenarios(
-    eir          = eir,
-    dn0_use      = net_now$dn0,
-    dn0_future   = net_next$dn0,
-    Q0           = Q0_vec,
-    phi_bednets  = phi_vec,
-    seasonal     = season_vec,
-    routine      = routine_vec,
-    itn_use      = net_now$itn_use,
-    irs_use      = irs_vec,
-    itn_future   = net_next$itn_use,
-    irs_future   = irs_future_vec,
-    lsm          = lsm_vec)
-
-  out <- run_malaria_emulator(scenarios = scen,
-                              predictor = "prevalence",
-                              model_types = c("LSTM", "GRU"))
-  out$scenario <- paste0("scenario", i)
-  out
-}
+# Run comprehensive scenarios with prevalence-driven workflow
+results <- run_mint_scenarios(
+  # Current and future resistance levels
+  res_use        = c(0.30, 0.45, 0.20),   # current pyrethroid resistance
+  res_future     = c(0.60, 0.75, 0.50),   # resistance after next campaign
+  
+  # Proportion of each long‑lasting net type (must sum to ≤1)
+  py_only        = c(0.40, 0.30, 0.50),
+  py_pbo         = c(0.10, 0.15, 0.05),
+  py_pyrrole     = c(0.00, 0.05, 0.00),
+  py_ppf         = c(0.10, 0.10, 0.15),
+  
+  # Malaria environment parameters
+  prev_vec       = c(0.20, 0.40, 0.60),   # measured PfPR2‑10
+  Q0_vec         = c(0.65, 0.75, 0.85),   # anthropophagy
+  phi_vec        = c(0.45, 0.65, 0.75),   # proportion bites in bed
+  season_vec     = c(0, 1, 1),            # perennial vs seasonal
+  routine_vec    = c(0, 0, 1),            # routine ITN distribution?
+  irs_vec        = c(0.10, 0.35, 0.70),   # IRS coverage now
+  irs_future_vec = c(0.20, 0.40, 0.50),   # IRS after campaign
+  lsm_vec        = c(0.05, 0.45, 0.85)    # LSM coverage
+)
 
 ###############################################################################
-# 4.  Execute three composite scenarios                                   
+# 2.  Save outputs & create visualizations                                📊
 ###############################################################################
-results <- do.call(rbind, lapply(seq_along(res_use), run_scenario))
-write.csv(results, "results_prevalence.csv", row.names = FALSE)
-create_scenario_plots(results, output_dir = "output/plots")
+# Access results for both predictors
+write.csv(results$prevalence, "results_prevalence.csv", row.names = FALSE)
+write.csv(results$cases, "results_cases.csv", row.names = FALSE)
+
+# Generate plots
+create_scenario_plots(results$prevalence, output_dir = "output/plots")
+create_scenario_plots(results$cases, output_dir = "output/plots")
 ```
 
 **What just happened?**
 
-1. Field prevalence + entomological context were up‑converted into *initial EIR* using ensemble ML models (XGBoost + Random Forest).
-2. Those EIRs became inputs for the neural‑network emulator.
-3. Three what‑if net‑mix scenarios returned prevalence projections in under a second.
+1. Field prevalence + entomological context were up‑converted into *initial EIR* using ML models (XGBoost by default).
+2. Those EIRs became inputs for the neural‑network emulator (LSTM by default).
+3. Three what‑if net‑mix scenarios returned both prevalence and case projections in under a second.
+
+### Advanced Model Options 🧪
+
+While the defaults use well-tested models (XGBoost for EIR, LSTM for predictions), experimental models are available:
+
+```r
+# Use ensemble of models for EIR estimation (averages predictions)
+results <- run_mint_scenarios(
+  # ... your parameters ...
+  eir_models = c("xgboost", "rf")  # Random Forest is experimental
+)
+
+# Compare multiple prediction models (returns separate time series)
+results <- run_mint_scenarios(
+  # ... your parameters ...
+  prevalence_models = c("LSTM", "GRU")  # GRU is experimental
+)
+
+# Run only prevalence predictions with specific models
+results <- run_mint_scenarios(
+  # ... your parameters ...
+  predictor = "prevalence",
+  eir_models = c("xgboost", "rf"),
+  prevalence_models = "GRU"
+)
+```
+
+**Model behavior:**
+- **EIR models**: Multiple models create an ensemble (averaged predictions)
+- **Prevalence models**: Multiple models create individual time series for comparison
+- **Experimental models** (`rf`, `GRU`) may have different performance characteristics
 
 ---
 
@@ -217,43 +204,44 @@ create_scenario_plots(results, output_dir = "output/plots")
 
 | Group                       | Parameter                | Description                                              | Typical Range |
 | --------------------------- | ------------------------ | -------------------------------------------------------- | ------------- |
-| **Transmission intensity**  | `eir`                    | Entomological inoculation rate (infectious bites pp/yr)  | 0.1 – 500+    |
-| **ITN coverage & efficacy** | `itn_use` / `itn_future` | Proportion of population sleeping under an ITN           | 0 – 1         |
-|                             | `dn0_use` / `dn0_future` | Pre‑intervention reduction in biting due to ITNs         | 0 – 1         |
-|                             | `phi_bednets`            | Fraction of mosquito bites taken while humans are in bed | 0 – 1         |
+| **Transmission intensity**  | `eir`                    | Entomological inoculation rate (infectious bites pp/yr)  | 0.1 – 500+    |
+| **ITN coverage & efficacy** | `itn_use` / `itn_future` | Proportion of population sleeping under an ITN           | 0 – 1         |
+|                             | `dn0_use` / `dn0_future` | Pre‑intervention reduction in biting due to ITNs         | 0 – 1         |
+|                             | `phi_bednets`            | Fraction of mosquito bites taken while humans are in bed | 0 – 1         |
 |                             | `routine`                | Routine ITN distribution each year (0/1)                 | {0,1}         |
-| **IRS & LSM**               | `irs_use` / `irs_future` | Household coverage of IRS                                | 0 – 1         |
-|                             | `lsm`                    | Larval source management coverage                        | 0 – 1         |
-| **Vector behaviour**        | `Q0`                     | Human blood index                                        | 0.5 – 0.9     |
-|                             | `seasonal`               | 0 = perennial, 1 = seasonal transmission                 | {0,1}         |
+| **IRS & LSM**               | `irs_use` / `irs_future` | Household coverage of IRS                                | 0 – 1         |
+|                             | `lsm`                    | Larval source management coverage                        | 0 – 1         |
+| **Vector behaviour**        | `Q0`                     | Human blood index                                        | 0.5 – 0.9     |
+|                             | `seasonal`               | 0 = perennial, 1 = seasonal transmission                 | {0,1}         |
 
 ---
 
 ## 📊 Interpreting Outputs
 
-- **Time** – x‑axis is years (simulated up to 6 y by default).
-- **Vertical dashed line (year 3)** – change‑point between *current* and *future* coverage inputs.
-- **Solid lines** – GRU (blue) & LSTM (orange) predictions.
+- **Time** – x‑axis is years (simulated up to 6 y by default).
+- **Vertical dashed line (year 3)** – change‑point between *current* and *future* coverage inputs.
+- **Solid lines** – Neural network predictions (LSTM/GRU).
 - **Dashed lines** (simulation mode only) – ground‑truth from *malariasimulation*.
 
 ### Prevalence (`predictor = "prevalence"`)
 
-- Output: parasite prevalence in children <5 y.
-- Y‑axis: proportion infected (0 – 1).
+- Output: parasite prevalence in children <5 y.
+- Y‑axis: proportion infected (0 – 1).
 
 ### Clinical cases (`predictor = "cases"`)
 
-- Output: incident clinical cases per 1000 population per 30 days.
+- Output: incident clinical cases per 1000 population per 30 days.
 - Y‑axis: incidence rate.
 
 ---
 
 ## 👍 Best Practices
 
-1. **Prototype with direct emulation** before running heavy simulations.
-2. **Validate**: include at least one scenario in simulation mode to benchmark emulator accuracy in your setting.
-3. **Keep parameters in-range**—especially coverage (0 – 1) and `eir` (≥0).
-4. **Scale cores**: `max_threads = parallel::detectCores() - 1` is usually safe.
+1. **Start with defaults** – `eir_models = "xgboost"` and `prevalence_models = "LSTM"` are well‑validated.
+2. **Prototype with direct emulation** before running heavy simulations.
+3. **Validate**: include at least one scenario in simulation mode to benchmark emulator accuracy in your setting.
+4. **Keep parameters in‑range**—especially coverage (0 – 1) and `eir` (≥0).
+5. **Experiment carefully** – when using `rf` or `GRU` models, compare results with defaults first.
 
 ---
 
