@@ -45,8 +45,7 @@ run_mint_scenarios <- function(
 
   # Validate inputs
   n_scenarios <- length(res_use)
-  if (length(res_future) != n_scenarios || 
-      length(py_only) != n_scenarios ||
+  if (length(py_only) != n_scenarios ||
       length(py_pbo) != n_scenarios ||
       length(py_pyrrole) != n_scenarios ||
       length(py_ppf) != n_scenarios) {
