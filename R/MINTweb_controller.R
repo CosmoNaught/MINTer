@@ -23,7 +23,7 @@
 run_mint_scenarios <- function(
   # Net combination settings
   res_use,
-  res_future = NUL,
+  res_future = NULL,
   py_only,
   py_pbo,
   py_pyrrole,
