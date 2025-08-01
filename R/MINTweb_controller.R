@@ -149,6 +149,7 @@ run_mint_scenarios <- function(
         predictor   = "prevalence",
         model_types = prevalence_models
       )
+      results$prevalence$scenario <- paste0("Scenario", i)
     }
     
     if ("cases" %in% predictor) {
@@ -157,6 +158,7 @@ run_mint_scenarios <- function(
         predictor   = "cases",
         model_types = prevalence_models
       )
+      results$cases$scenario <- paste0("Scenario", i)
     }
     
     results
