@@ -23,7 +23,7 @@
 run_mint_scenarios <- function(
   # Net combination settings
   res_use,
-  res_future,
+  res_future = NUL,
   py_only,
   py_pbo,
   py_pyrrole,
@@ -42,7 +42,7 @@ run_mint_scenarios <- function(
   prevalence_models = "LSTM",
   predictor = c("prevalence", "cases")
 ) {
-  
+
   # Validate inputs
   n_scenarios <- length(res_use)
   if (length(res_future) != n_scenarios || 
@@ -52,7 +52,7 @@ run_mint_scenarios <- function(
       length(py_ppf) != n_scenarios) {
     stop("All net combination vectors must have the same length")
   }
-  
+ 
   n_settings <- length(prev_vec)
   if (length(Q0_vec) != n_settings || 
       length(phi_vec) != n_settings ||
@@ -62,6 +62,11 @@ run_mint_scenarios <- function(
       length(irs_future_vec) != n_settings ||
       length(lsm_vec) != n_settings) {
     stop("All malaria environment vectors must have the same length")
+  }
+
+  # If resistance is sustained through campaigns default to resistance use
+  if (is.null(res_future) || length(res_future) == 0) {
+    res_future <- res_use
   }
   
   # Validate predictors

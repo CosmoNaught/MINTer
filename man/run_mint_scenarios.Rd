@@ -6,7 +6,7 @@
 \usage{
 run_mint_scenarios(
   res_use,
-  res_future,
+  res_future = NUL,
   py_only,
   py_pbo,
   py_pyrrole,
