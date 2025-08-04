@@ -1,222 +1,256 @@
-## Introduction
+# MINTer &#x20;
 
-MINTer (Malaria INTervention emulator in R) is an R package that provides fast emulation of malaria transmission models based off malariasimulation (link!). It offers two main workflows:
+**M**alaria **INT**ervention **e**mulator in **R**\
+Fast, lightweight emulation of *malariasimulation* written entirely for the R ecosystem.
 
-1. **Full simulation + emulation**: Run detailed malaria simulations and then use trained neural networks to emulate the results
-2. **Direct emulation**: Skip the simulation step and directly generate predictions using pre-trained models
+---
 
-The package uses torch (implemented in Python) base nerual network models (GRU and LSTM) to provide rapid predictions of malaria prevalence and clinical cases under various intervention scenarios.
+## ✨ Key Features
 
-## Installation
+| Feature                     | Description                                                                                                                                               |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Direct emulation**        | Predict prevalence or clinical cases in seconds using pre‑trained GRU / LSTM networks—no simulator required.                                              |
+| **Full pipeline mode**      | Launch full *malariasimulation* runs, store outputs in a DuckDB database with **segMINT**, then emulate for counter‑factuals or performance benchmarking. |
+| **Python‑free R workflow**  | Python (Torch) is configured automatically on first use—no manual setup.                                                                                  |
+| **New! **``** integration** | Convert point‑prevalence surveys directly into entomological inoculation rate (EIR) inputs, then pipe them straight into the emulator.                    |
 
-You can install MINTer from GitHub:
+---
 
+## 📦 Installation
 
-``` r
-# Install devtools if you haven't already
-if (!requireNamespace("devtools", quietly = TRUE)) {
+```r
+# 1. Install devtools if needed
+if (!requireNamespace("devtools", quietly = TRUE))
   install.packages("devtools")
-}
 
-# Install MINTer
+# 2. Install MINTer
 devtools::install_github("CosmoNaught/MINTer")
-```
 
-### Dependencies
+# 3. (Optional) Tools for the full pipeline
+#    segMINT  – database helper
+#    estiMINT – prevalence → EIR models
 
-MINTer requires Python with PyTorch installed for the neural network models. The package will automatically set up the Python environment when first loaded:
-
-
-``` r
-library(MINTer)
-```
-
-For database mode (Option 2 below), you'll also need the segMINT package:
-
-
-``` r
-# Install segMINT for database functionality
 devtools::install_github("CosmoNaught/segMINT")
+devtools::install_github("CosmoNaught/estiMINT")
 ```
 
-## Quick Start
+### System Requirements
 
-There are two main ways to use MINTer:
+- **R ≥ 4.2**
+- Python 3.8 – 3.12 with **torch** (installed automatically via `{reticulate}`)
+- For simulation mode: a C‑compiler (e.g., `clang`, `gcc`) and OpenMP‑capable CPU
 
-### Option 1: Direct Emulation (Fastest)
+> **Tip**\
+> The first call to `library(MINTer)` can take \~1 min while the torch environment is built.
 
-If you want quick predictions without running full simulations:
+---
 
+## 🚀 Quick Start
 
-``` r
+### 1. Direct Emulation (fastest)
+
+```r
 library(MINTer)
 
-# Create scenarios
-
-# Create intervention scenarios
+# Define 3 intervention scenarios
 scenarios <- create_scenarios(
-  eir = c(5.2, 35.8, 180.5),
-  dn0_use = c(0.15, 0.35, 0.55),
-  dn0_future = c(0.20, 0.45, 0.65),
-  Q0 = c(0.65, 0.75, 0.85),
-  phi_bednets = c(0.45, 0.65, 0.75),
-  seasonal = c(0, 1, 1),
-  routine = c(0, 0, 1),
-  itn_use = c(0.25, 0.55, 0.85),
-  irs_use = c(0.10, 0.35, 0.70),
-  itn_future = c(0.30, 0.60, 0.90),
-  irs_future = c(0.15, 0.40, 0.75),
-  lsm = c(0.05, 0.45, 0.85)
+  eir          = c(5.2, 35.8, 180.5),
+  dn0_use      = c(0.15, 0.35, 0.55),
+  dn0_future   = c(0.20, 0.45, 0.65),
+  Q0           = c(0.65, 0.75, 0.85),
+  phi_bednets  = c(0.45, 0.65, 0.75),
+  seasonal     = c(0, 1, 1),
+  routine      = c(0, 0, 1),
+  itn_use      = c(0.25, 0.55, 0.85),
+  irs_use      = c(0.10, 0.35, 0.70),
+  itn_future   = c(0.30, 0.60, 0.90),
+  irs_future   = c(0.15, 0.40, 0.75),
+  lsm          = c(0.05, 0.45, 0.85)
 )
 
-# Run emulator - returns a dataframe
-results <- MINTer::run_malaria_emulator(
-  scenarios = scenarios,
-  predictor = 'prevalence',
-  model_types = c('LSTM','GRU')
+# Run the neural‑network emulator
+results <- run_malaria_emulator(
+  scenarios   = scenarios,
+  predictor   = "prevalence",   # or "cases"
+  model_types = c("LSTM", "GRU")
 )
 
-# Create plots - generates 3 PNGs (one for each scenario)
-plots <- MINTer::create_scenario_plots(results, output_dir = "output/plots")
+# Plot and save
+create_scenario_plots(results, output_dir = "output/plots")
 ```
 
-### Option 2: Full Simulation + Database + Emulation
+### 2. Full Simulation ➜ Database ➜ Emulation
 
-For more detailed analysis with access to full simulation data:
-
-
-``` r
+```r
 library(MINTer)
-library(segMINT)  # Required for database creation
+library(segMINT)
 
-# Step 1: Create scenarios for simulation
-scenarios <- MINTer::create_malariasim_scenarios(
-  eir = c(5.2, 35.8, 180.5),
-  dn0_use = c(0.15, 0.35, 0.55),
-  dn0_future = c(0.20, 0.45, 0.65),
-  Q0 = c(0.65, 0.75, 0.85),
-  phi_bednets = c(0.45, 0.65, 0.75),
-  seasonal = c(0, 1, 1),
-  routine = c(0, 0, 1),
-  itn_use = c(0.25, 0.55, 0.85),
-  irs_use = c(0.10, 0.35, 0.70),
-  itn_future = c(0.30, 0.60, 0.90),
-  irs_future = c(0.15, 0.40, 0.75),
-  lsm = c(0.05, 0.45, 0.85)
-)
+# 2A. Design LHS of simulation inputs
+design <- create_malariasim_scenarios(...)
+write.csv(design, "Data/malariasim_scenarios.csv", row.names = FALSE)
 
-# Step 2: Run malaria simulations
-MINTer::run_malariasim(
-  max_threads = 12,
-  lhs_scenario = "Data/malariasim_scenarios.csv",
-  output_dir = "Data/Simout"
-)
+# 2B. Run simulations (parallelised)
+run_malariasim(max_threads = 12,
+               lhs_scenario = "Data/malariasim_scenarios.csv",
+               output_dir   = "Data/Simout")
 
-# Step 3: Create database from simulation results
+# 2C. Ingest outputs into DuckDB
+dir.create("Data/Database", recursive = TRUE, showWarnings = FALSE)
 segMINT::create_database(
-  dir = "/path/to/your/working/dir/Data/Database", 
-  file_name = "malariasim_database.duckdb", # custom name
-  table_name = "simulation_results", # custom name
-  data_dir = "/path/to/your/working/dir/Data/Simout",
-  N = "all",
-  randomize = FALSE
+  dir        = "Data/Database",
+  file_name  = "malariasim.duckdb",
+  table_name = "sim_results",
+  data_dir   = "Data/Simout"
 )
 
-# Step 4: Run emulator with counterfactual analysis for your 3rd malariasimulation scenario to explore prevalence changes across a range of EIR values
-
-results_cases <- MINTer::run_malaria_emulator(
-  db_path = "/home/cosmo/net/malaria/Cosmo/Emulator-Test/Data/Database/malariasim_database.duckdb",
-  param_index = 3,
-  predictor = "cases",
+# 2D. Emulate counter‑factuals on scenario #3
+cases <- run_malaria_emulator(
+  db_path       = "Data/Database/malariasim.duckdb",
+  param_index   = 3,                     # pull inputs from sim #3
+  predictor     = "cases",
   counterfactual = list(eir = c(0.5, 60, 300))
 )
-
 ```
 
-## Understanding the model Parameters
+---
 
-### Intervention Parameters
+## 🔌 New: Prevalence‑Driven Workflows with **estiMINT**
 
-- **eir**: Entomological Inoculation Rate - annual number of infectious bites per person
-- **itn_use** / **itn_future**: Current and future insecticide-treated net (ITN) coverage
-- **irs_use** / **irs_future**: Current and future indoor residual spraying (IRS) coverage
-- **lsm**: Larval source management coverage (0-1)
+Field surveys usually measure *parasite prevalence*, not EIR. Thus users will not likely have access to EIR readings to interface with MINTer natively. **estiMINT** bridges that gap by converting prevalence + entomological context straight into starting‑EIR values that MINTer understands.
 
-### Bednet Parameters
+### End‑to‑End Example
 
-- **dn0_use** / **dn0_future**: Bednet effectiveness against mosquito bites (0-1)
-- **phi_bednets**: Proportion of mosquito bites occurring when humans are in bed
-- **routine**: Whether routine bednet distribution is implemented (0=no, 1=yes)
+```r
+library(MINTer)
 
-### Mosquito Parameters
+###############################################################################
+# 1.  Input your bed‑net mix & context                                   🔧
+###############################################################################
+# Run comprehensive scenarios with prevalence-driven workflow
+results <- run_mint_scenarios(
+  # Current and future resistance levels
+  res_use        = c(0.30, 0.45, 0.20),   # current pyrethroid resistance
+  res_future     = c(0.60, 0.75, 0.50),   # resistance after next campaign
+  
+  # Proportion of each long‑lasting net type (must sum to ≤1)
+  py_only        = c(0.40, 0.30, 0.50),
+  py_pbo         = c(0.10, 0.15, 0.05),
+  py_pyrrole     = c(0.00, 0.05, 0.00),
+  py_ppf         = c(0.10, 0.10, 0.15),
+  
+  # Malaria environment parameters
+  prev_vec       = c(0.20, 0.40, 0.60),   # measured PfPR2‑10
+  Q0_vec         = c(0.65, 0.75, 0.85),   # anthropophagy
+  phi_vec        = c(0.45, 0.65, 0.75),   # proportion bites in bed
+  season_vec     = c(0, 1, 1),            # perennial vs seasonal
+  routine_vec    = c(0, 0, 1),            # routine ITN distribution?
+  irs_vec        = c(0.10, 0.35, 0.70),   # IRS coverage now
+  irs_future_vec = c(0.20, 0.40, 0.50),   # IRS after campaign
+  lsm_vec        = c(0.05, 0.45, 0.85)    # LSM coverage
+)
 
-- **Q0**: Human blood index - proportion of blood meals taken from humans
-- **seasonal**: Transmission pattern (0=perennial/year-round, 1=seasonal)
+###############################################################################
+# 2.  Save outputs & create visualizations                                📊
+###############################################################################
+# Access results for both predictors
+write.csv(results$prevalence, "results_prevalence.csv", row.names = FALSE)
+write.csv(results$cases, "results_cases.csv", row.names = FALSE)
 
-## Interpreting Results
-
-### Understanding the Plots
-
-All plots generated by MINTer include:
-- **Time axis**: Shown in years (0-6 years by default)
-- **Vertical line at year 3**: Indicates the transition between "current" and "future" intervention coverage
-- **Model predictions**: Lines showing GRU and/or LSTM predictions
-- **For database mode**: Dashed lines show actual simulation results for comparison
-
-### Prevalence Predictions
-
-When using `predictor = "prevalence"`, the emulator predicts malaria prevalence in children under 5 years old:
-
-
-``` r
-# Results include:
-# - Timesteps in days (converted to years in plots)
-# - Predicted prevalence values (0-1)
-# - Comparison between GRU and LSTM models
-# - Y-axis: Proportion infected (0 = 0%, 1 = 100%)
+# Generate plots
+create_scenario_plots(results$prevalence, output_dir = "output/plots")
+create_scenario_plots(results$cases, output_dir = "output/plots")
 ```
 
-### Clinical Cases Predictions
+**What just happened?**
 
-When using `predictor = "cases"`, the emulator predicts clinical cases per 1000 population:
+1. Field prevalence + entomological context were up‑converted into *initial EIR* using ML models (XGBoost by default).
+2. Those EIRs became inputs for the neural‑network emulator (LSTM by default).
+3. Three what‑if net‑mix scenarios returned both prevalence and case projections in under a second.
 
+### Advanced Model Options 🧪
 
-``` r
-# Results include:
-# - Timesteps in 14-day intervals
-# - Cases per 1000 population per 14 days
-# - Model comparisons
-# - Y-axis: Clinical incidence rate
+While the defaults use well-tested models (XGBoost for EIR, LSTM for predictions), experimental models are available:
+
+```r
+# Use ensemble of models for EIR estimation (averages predictions)
+results <- run_mint_scenarios(
+  # ... your parameters ...
+  eir_models = c("xgboost", "rf")  # Random Forest is experimental
+)
+
+# Compare multiple prediction models (returns separate time series)
+results <- run_mint_scenarios(
+  # ... your parameters ...
+  prevalence_models = c("LSTM", "GRU")  # GRU is experimental
+)
+
+# Run only prevalence predictions with specific models
+results <- run_mint_scenarios(
+  # ... your parameters ...
+  predictor = "prevalence",
+  eir_models = c("xgboost", "rf"),
+  prevalence_models = "GRU"
+)
 ```
 
-## Tips and Best Practices
+**Model behavior:**
+- **EIR models**: Multiple models create an ensemble (averaged predictions)
+- **Prevalence models**: Multiple models create individual time series for comparison
+- **Experimental models** (`rf`, `GRU`) may have different performance characteristics
 
-1. **Start with scenario mode** for quick exploration of parameter space
-2. **Use database mode** when you need:
-   - Access to full simulation data
-   - Counterfactual analysis on existing simulations
-   - Validation against simulation results
-3. **Parameter ranges (NOTE TO EXPAND ON THIS!)**:
-   - Keep coverage parameters (itn_use, irs_use, lsm) between 0 and 1
-   - EIR typically ranges from 0.1 to 500+
-   - Effectiveness parameters (dn0) should be between 0 and 1
-4. **Computational resources**:
-   - Scenario mode is very fast (seconds)
-   - Full simulations can take anywhere from minutes to hours depending on the number of scenarios so be careful when assigning large jobs ensure you have appropriate resources
-   - Use `max_threads` to control parallel processing
+---
 
-## Troubleshooting
+## ⚙️ Model Parameters – Cheat‑Sheet
 
-### Python/PyTorch Issues
+| Group                       | Parameter                | Description                                              | Typical Range |
+| --------------------------- | ------------------------ | -------------------------------------------------------- | ------------- |
+| **Transmission intensity**  | `eir`                    | Entomological inoculation rate (infectious bites pp/yr)  | 0.1 – 500+    |
+| **ITN coverage & efficacy** | `itn_use` / `itn_future` | Proportion of population sleeping under an ITN           | 0 – 1         |
+|                             | `dn0_use` / `dn0_future` | Pre‑intervention reduction in biting due to ITNs         | 0 – 1         |
+|                             | `phi_bednets`            | Fraction of mosquito bites taken while humans are in bed | 0 – 1         |
+|                             | `routine`                | Routine ITN distribution each year (0/1)                 | {0,1}         |
+| **IRS & LSM**               | `irs_use` / `irs_future` | Household coverage of IRS                                | 0 – 1         |
+|                             | `lsm`                    | Larval source management coverage                        | 0 – 1         |
+| **Vector behaviour**        | `Q0`                     | Human blood index                                        | 0.5 – 0.9     |
+|                             | `seasonal`               | 0 = perennial, 1 = seasonal transmission                 | {0,1}         |
 
-If you encounter Python-related errors:
+---
 
+## 📊 Interpreting Outputs
 
-``` r
-# Check Python configuration
+- **Time** – x‑axis is years (simulated up to 6 y by default).
+- **Vertical dashed line (year 3)** – change‑point between *current* and *future* coverage inputs.
+- **Solid lines** – Neural network predictions (LSTM/GRU).
+- **Dashed lines** (simulation mode only) – ground‑truth from *malariasimulation*.
+
+### Prevalence (`predictor = "prevalence"`)
+
+- Output: parasite prevalence in children <5 y.
+- Y‑axis: proportion infected (0 – 1).
+
+### Clinical cases (`predictor = "cases"`)
+
+- Output: incident clinical cases per 1000 population per 30 days.
+- Y‑axis: incidence rate.
+
+---
+
+## 👍 Best Practices
+
+1. **Start with defaults** – `eir_models = "xgboost"` and `prevalence_models = "LSTM"` are well‑validated.
+2. **Prototype with direct emulation** before running heavy simulations.
+3. **Validate**: include at least one scenario in simulation mode to benchmark emulator accuracy in your setting.
+4. **Keep parameters in‑range**—especially coverage (0 – 1) and `eir` (≥0).
+5. **Experiment carefully** – when using `rf` or `GRU` models, compare results with defaults first.
+
+---
+
+## 🛠️ Troubleshooting
+
+```r
 reticulate::py_config()
-
-# The package automatically initializes Python when loaded
-# If you need to reinitialize:
-MINTer::initialize_python(verbose = TRUE)
+# Re‑initialise if needed
+initialize_python(verbose = TRUE)
 ```
+
+---
