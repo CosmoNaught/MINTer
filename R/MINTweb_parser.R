@@ -1,5 +1,4 @@
-#' Return the vector of net types contained in an ITN‑parameter file
-#' 
+#' Return the vector of net types contained in an ITN-parameter file
 #' @param itn_params_path Path to an RDS created by MINTer
 #' @export
 available_net_types <- function(itn_params_path = NULL) {
@@ -12,7 +11,7 @@ available_net_types <- function(itn_params_path = NULL) {
 
 #' Define bednet types and create spline fits
 #'
-#' @param NET_TYPES Character vector of net types to process
+#' @param net_types Character vector of net types to process
 #' @param itn_params_path Path to RDS file containing ITN parameters. If NULL, uses bundled data.
 #' @param strict Allows for future expansion of dataset (defaul FALSE to use only available nets in RDS)
 #' @return Named list of smooth.spline objects, one for each net type
@@ -25,7 +24,7 @@ define_bednet_types <- function(net_types,
     itn_params_path <- system.file("extdata", "itn_dn0.rds", package = "MINTer")
   }
   if (!file.exists(itn_params_path)) {
-    stop("ITN‑parameter file not found: ", itn_params_path)
+    stop("ITN-parameter file not found: ", itn_params_path)
   }
 
   itn_params <- readRDS(itn_params_path)
@@ -90,9 +89,9 @@ resistance_to_overall_dn0 <- function(splines,
 
 #' Calculate overall dn0 in a single call
 #'
-#' Supply the net‑type usage mix as named arguments and get  
-#'   * **dn0** – the weighted‐average dn0 at the requested resistance level, and  
-#'   * **itn_use** – the total usage proportion of pyrethroid‑based ITNs.  
+#' Supply the net-type usage mix as named arguments and get
+#'   * **dn0** - the weighted-average dn0 at the requested resistance level, and  
+#'   * **itn_use** - the total usage proportion of pyrethroid-based ITNs.  
 #'
 #' @param resistance_level Numeric resistance level.
 #' @param ...              Named numeric values giving the usage proportion for
@@ -103,13 +102,6 @@ resistance_to_overall_dn0 <- function(splines,
 #'                         execution stops when any requested net type is
 #'                         missing from the parameter file (even after the
 #'                         initial name check).
-#'
-#' @return A list with two elements
-#' \describe{
-#'   \item{dn0}{Numeric scalar – overall dn0.}
-#'   \item{itn_use}{Numeric scalar – sum of the usage proportions whose names
-#'                 start with `"pyrethroid"`.}
-#' }
 #' @export
 calculate_overall_dn0 <- function(resistance_level,
                                   ...,

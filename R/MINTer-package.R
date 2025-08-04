@@ -13,6 +13,7 @@
 #' @importFrom future plan
 #' @importFrom future.apply future_lapply
 #' @importFrom progressr progressor handlers with_progress
+#' @importFrom stats predict setNames smooth.spline weighted.mean
 #' @importFrom rlang .data
 ## usethis namespace: end
 NULL

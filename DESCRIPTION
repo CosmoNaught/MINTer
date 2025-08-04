@@ -21,14 +21,14 @@ Imports:
     ggplot2,
     jsonlite,
     malariasimulation,
-    malariaEquilibrium,
-    malariaEquilibriumVivax,
     data.table,
     future,
     future.apply,
     progressr,
     dplyr,
+    stats,
     rlang,
+    estiMINT,
     cli
 Suggests:
     testthat (>= 3.0.0),
@@ -36,8 +36,6 @@ Suggests:
     rmarkdown
 Remotes:
     mrc-ide/malariasimulation,
-    mrc-ide/malariaEquilibrium,
-    mrc-ide/malariaEquilibriumVivax,
     CosmoNaught/estiMINT
 Config/testthat/edition: 3
 VignetteBuilder: knitr

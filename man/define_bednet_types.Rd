@@ -7,11 +7,11 @@
 define_bednet_types(net_types, itn_params_path = NULL, strict = FALSE)
 }
 \arguments{
+\item{net_types}{Character vector of net types to process}
+
 \item{itn_params_path}{Path to RDS file containing ITN parameters. If NULL, uses bundled data.}
 
 \item{strict}{Allows for future expansion of dataset (defaul FALSE to use only available nets in RDS)}
-
-\item{NET_TYPES}{Character vector of net types to process}
 }
 \value{
 Named list of smooth.spline objects, one for each net type

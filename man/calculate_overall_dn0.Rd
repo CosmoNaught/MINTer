@@ -25,18 +25,10 @@ execution stops when any requested net type is
 missing from the parameter file (even after the
 initial name check).}
 }
-\value{
-A list with two elements
-\describe{
-\item{dn0}{Numeric scalar – overall dn0.}
-\item{itn_use}{Numeric scalar – sum of the usage proportions whose names
-start with \code{"pyrethroid"}.}
-}
-}
 \description{
-Supply the net‑type usage mix as named arguments and get
+Supply the net-type usage mix as named arguments and get
 \itemize{
-\item \strong{dn0} – the weighted‐average dn0 at the requested resistance level, and
-\item \strong{itn_use} – the total usage proportion of pyrethroid‑based ITNs.
+\item \strong{dn0} - the weighted-average dn0 at the requested resistance level, and
+\item \strong{itn_use} - the total usage proportion of pyrethroid-based ITNs.
 }
 }

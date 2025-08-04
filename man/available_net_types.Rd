@@ -2,7 +2,7 @@
 % Please edit documentation in R/MINTweb_parser.R
 \name{available_net_types}
 \alias{available_net_types}
-\title{Return the vector of net types contained in an ITN‑parameter file}
+\title{Return the vector of net types contained in an ITN-parameter file}
 \usage{
 available_net_types(itn_params_path = NULL)
 }
@@ -10,5 +10,5 @@ available_net_types(itn_params_path = NULL)
 \item{itn_params_path}{Path to an RDS created by MINTer}
 }
 \description{
-Return the vector of net types contained in an ITN‑parameter file
+Return the vector of net types contained in an ITN-parameter file
 }
