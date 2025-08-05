@@ -98,14 +98,14 @@ run_mint_scenarios <- function(
     
     # Prepare runtime data for EIR prediction
     runtime <- data.frame(
-      prevalence  = prev_vec,
-      dn0_use     = rep(net_now$dn0, n_settings),
-      Q0          = Q0_vec,
-      phi_bednets = phi_vec,
-      seasonal    = season_vec,
-      routine     = routine_vec,
-      itn_use     = rep(net_now$itn_use, n_settings),
-      irs_use     = irs_vec
+      prevalence  = prev_vec[i],
+      dn0_use     = net_now$dn0,
+      Q0          = Q0_vec[i],
+      phi_bednets = phi_vec[i],
+      seasonal    = season_vec[i],
+      routine     = routine_vec[i],
+      itn_use     = net_now$itn_use,
+      irs_use     = irs_vec[i]
     )
     
     # Calculate EIR using specified models
@@ -129,19 +129,19 @@ run_mint_scenarios <- function(
     # Create scenarios
     scen <- create_scenarios(
       eir          = eir,
-      dn0_use      = rep(net_now$dn0, n_settings),
-      dn0_future   = rep(net_next$dn0, n_settings),
-      Q0           = Q0_vec,
-      phi_bednets  = phi_vec,
-      seasonal     = season_vec,
-      routine      = routine_vec,
-      itn_use      = rep(net_now$itn_use, n_settings),
-      irs_use      = irs_vec,
-      itn_future   = rep(net_next$itn_use, n_settings),
-      irs_future   = irs_future_vec,
-      lsm          = lsm_vec
+      dn0_use      = net_now$dn0,
+      dn0_future   = net_next$dn0,
+      Q0           = Q0_vec[i],
+      phi_bednets  = phi_vec[i],
+      seasonal     = season_vec[i],
+      routine      = routine_vec[i],
+      itn_use      = net_now$itn_use,
+      irs_use      = irs_vec[i],
+      itn_future   = net_next$itn_use,
+      irs_future   = irs_future_vec[i],
+      lsm          = lsm_vec[i]
     )
-    
+
     # Run emulator for each predictor
     results <- list()
     
@@ -190,11 +190,17 @@ run_mint_scenarios <- function(
   out <- list()
   
   if ("prevalence" %in% predictor) {
-    out$prevalence <- do.call(rbind, lapply(runs, function(x) x$prevalence))
+    out$prevalence <- do.call(rbind, lapply(runs, `[[`, "prevalence")) |>
+      dplyr::group_by(scenario) |>                 # <–– NEW
+      dplyr::mutate(index = dplyr::cur_group_id()) |>
+      dplyr::ungroup()                             # <–– NEW
   }
-  
+
   if ("cases" %in% predictor) {
-    out$cases <- do.call(rbind, lapply(runs, function(x) x$cases))
+    out$cases <- do.call(rbind, lapply(runs, `[[`, "cases")) |>
+      dplyr::group_by(scenario) |>                 # <–– NEW
+      dplyr::mutate(index = dplyr::cur_group_id()) |>
+      dplyr::ungroup()                             # <–– NEW
   }
   
   return(out)
