@@ -40,7 +40,9 @@ run_mint_scenarios <- function(
   # Model settings (with defaults)
   eir_models = "xgboost",
   prevalence_models = "LSTM",
-  predictor = c("prevalence", "cases")
+  predictor = c("prevalence", "cases"),
+  year_start,
+  year_end
 ) {
 
   # Validate inputs
@@ -156,7 +158,7 @@ run_mint_scenarios <- function(
       pretrained_cases <- estiMINT::load_pretrained_case_models()
       
       # Predict annual cases for years 3-4, 4-5, 5-6 per 1000 pop
-      years <- 3:5
+      years <- year_start:year_end
       new_data_cases <- tidyr::crossing(scen, year = years)
       
       xgb_predictions <- estiMINT::predict_annual_cases(

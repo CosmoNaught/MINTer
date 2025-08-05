@@ -21,7 +21,9 @@ run_mint_scenarios(
   lsm_vec,
   eir_models = "xgboost",
   prevalence_models = "LSTM",
-  predictor = c("prevalence", "cases")
+  predictor = c("prevalence", "cases"),
+  year_start,
+  year_end
 )
 }
 \arguments{
