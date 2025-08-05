@@ -155,6 +155,7 @@ run_mint_scenarios <- function(
     if ("cases" %in% predictor) {
       pretrained_cases <- estiMINT::load_pretrained_case_models()
       
+      # Predict annual cases for years 3-4, 4-5, 5-6 per 1000 pop
       years <- 3:5
       new_data_cases <- tidyr::crossing(scen, year = years)
       

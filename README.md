@@ -36,12 +36,12 @@ devtools::install_github("CosmoNaught/estiMINT")
 
 ### System Requirements
 
-- **R ≥ 4.2**
-- Python 3.8 – 3.12 with **torch** (installed automatically via `{reticulate}`)
+- **R ≥ 4.2**
+- Python 3.8 – 3.12 with **torch** (installed automatically via `{reticulate}`)
 - For simulation mode: a C‑compiler (e.g., `clang`, `gcc`) and OpenMP‑capable CPU
 
 > **Tip**\
-> The first call to `library(MINTer)` can take \~1 min while the torch environment is built.
+> The first call to `library(MINTer)` can take \~1 min while the torch environment is built.
 
 ---
 
@@ -164,12 +164,12 @@ create_scenario_plots(results$cases, output_dir = "output/plots")
 **What just happened?**
 
 1. Field prevalence + entomological context were up‑converted into *initial EIR* using ML models (XGBoost by default).
-2. Those EIRs became inputs for the neural‑network emulator (LSTM by default).
+2. Those EIRs became inputs for the neural‑network emulator (LSTM by default) for prevalence predictions, or XGBoost/RF ensemble models for case predictions.
 3. Three what‑if net‑mix scenarios returned both prevalence and case projections in under a second.
 
 ### Advanced Model Options 🧪
 
-While the defaults use well-tested models (XGBoost for EIR, LSTM for predictions), experimental models are available:
+While the defaults use well-tested models, alternative models are available:
 
 ```r
 # Use ensemble of models for EIR estimation (averages predictions)
@@ -178,7 +178,7 @@ results <- run_mint_scenarios(
   eir_models = c("xgboost", "rf")  # Random Forest is experimental
 )
 
-# Compare multiple prediction models (returns separate time series)
+# Compare multiple prevalence prediction models (returns separate time series)
 results <- run_mint_scenarios(
   # ... your parameters ...
   prevalence_models = c("LSTM", "GRU")  # GRU is experimental
@@ -195,8 +195,9 @@ results <- run_mint_scenarios(
 
 **Model behavior:**
 - **EIR models**: Multiple models create an ensemble (averaged predictions)
-- **Prevalence models**: Multiple models create individual time series for comparison
-- **Experimental models** (`rf`, `GRU`) may have different performance characteristics
+- **Prevalence models**: Multiple models create individual time series for comparison (LSTM/GRU neural networks)
+- **Case models**: Always uses XGBoost/RF ensemble for annual case predictions (years 3-5)
+- **Experimental models** (`rf` for EIR, `GRU` for prevalence) may have different performance characteristics
 
 ---
 
@@ -220,28 +221,30 @@ results <- run_mint_scenarios(
 
 - **Time** – x‑axis is years (simulated up to 6 y by default).
 - **Vertical dashed line (year 3)** – change‑point between *current* and *future* coverage inputs.
-- **Solid lines** – Neural network predictions (LSTM/GRU).
+- **Solid lines** – Model predictions (LSTM/GRU for prevalence, XGBoost/RF ensemble for cases).
 - **Dashed lines** (simulation mode only) – ground‑truth from *malariasimulation*.
 
 ### Prevalence (`predictor = "prevalence"`)
 
 - Output: parasite prevalence in children <5 y.
 - Y‑axis: proportion infected (0 – 1).
+- Method: Neural network predictions (LSTM/GRU).
 
 ### Clinical cases (`predictor = "cases"`)
 
-- Output: incident clinical cases per 1000 population per 30 days.
-- Y‑axis: incidence rate.
+- Output: annual incident clinical cases per 1000 population (years 3-5).
+- Y‑axis: incidence rate per 1000 population.
+- Method: XGBoost/Random Forest ensemble predictions.
 
 ---
 
 ## 👍 Best Practices
 
-1. **Start with defaults** – `eir_models = "xgboost"` and `prevalence_models = "LSTM"` are well‑validated.
+1. **Start with defaults** – `eir_models = "xgboost"`, `prevalence_models = "LSTM"`, and the built-in XGBoost/RF ensemble for cases are well‑validated.
 2. **Prototype with direct emulation** before running heavy simulations.
 3. **Validate**: include at least one scenario in simulation mode to benchmark emulator accuracy in your setting.
 4. **Keep parameters in‑range**—especially coverage (0 – 1) and `eir` (≥0).
-5. **Experiment carefully** – when using `rf` or `GRU` models, compare results with defaults first.
+5. **Experiment carefully** – when using `rf` for EIR or `GRU` for prevalence models, compare results with defaults first.
 
 ---
 
