@@ -153,11 +153,28 @@ run_mint_scenarios <- function(
     }
     
     if ("cases" %in% predictor) {
-      results$cases <- run_malaria_emulator(
-        scenarios   = scen,
-        predictor   = "cases",
-        model_types = prevalence_models
+      pretrained_cases <- estiMINT::load_pretrained_case_models()
+      
+      # Predict annual cases for years 3-4, 4-5, 5-6 per 1000 pop
+      years <- 3:5
+      new_data_cases <- tidyr::crossing(scen, year = years)
+      
+      xgb_predictions <- estiMINT::predict_annual_cases(
+        pretrained_cases$xgboost_cases,
+        new_data_cases,
+        pretrained_cases$feature_cols
       )
+      
+      rf_predictions <- estiMINT::predict_annual_cases(
+        pretrained_cases$rf_cases,
+        new_data_cases,
+        pretrained_cases$feature_cols
+      )
+      
+      new_data_cases$ensemble_cases_per_1000 <- (xgb_predictions + rf_predictions) / 2
+      
+      # Store results
+      results$cases <- new_data_cases
       results$cases$scenario <- paste0("Scenario", i)
     }
     

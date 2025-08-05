@@ -26,6 +26,7 @@ Imports:
     future.apply,
     progressr,
     dplyr,
+    tidyr,
     stats,
     rlang,
     estiMINT,
