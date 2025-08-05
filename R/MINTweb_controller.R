@@ -28,6 +28,8 @@ run_mint_scenarios <- function(
   py_pbo,
   py_pyrrole,
   py_ppf,
+  net_type_future = NULL,
+  itn_future,
   # Malaria environment settings
   prev_vec,
   Q0_vec,
@@ -87,14 +89,44 @@ run_mint_scenarios <- function(
       pyrethroid_pyrrole = py_pyrrole[i],
       pyrethroid_ppf     = py_ppf[i]
     )
-    
-    net_next <- calculate_overall_dn0(
-      resistance_level   = res_future[i],
-      pyrethroid_only    = py_only[i],
-      pyrethroid_pbo     = py_pbo[i],
-      pyrethroid_pyrrole = py_pyrrole[i],
-      pyrethroid_ppf     = py_ppf[i]
-    )
+    if (is.null(net_type_future)){
+      net_next <- calculate_overall_dn0(
+        resistance_level   = res_future[i],
+        pyrethroid_only    = py_only[i],
+        pyrethroid_pbo     = py_pbo[i],
+        pyrethroid_pyrrole = py_pyrrole[i],
+        pyrethroid_ppf     = py_ppf[i]
+      )
+    } else {
+      # User picked a specific future net type
+      pyo   <- 0
+      pypbo <- 0
+      pypyr <- 0
+      pppf <- 0
+
+      switch(net_type_future[i],
+        pyrethroid_only    = {
+          pyo <- itn_future[i]
+        },
+        pyrethroid_pbo     = {
+          pypbo <- itn_future[i]
+        },
+        pyrethroid_pyrrole = {
+          pypyr <- itn_future[i]
+        },
+        pyrethroid_ppf     = {
+          pppf <- itn_future[i]
+        }
+      )
+
+      net_next <- calculate_overall_dn0(
+        resistance_level   = res_future[i],
+        pyrethroid_only    = pyo,
+        pyrethroid_pbo     = pypbo,
+        pyrethroid_pyrrole = pypyr,
+        pyrethroid_ppf     = pppf
+      )
+    }
     
     # Prepare runtime data for EIR prediction
     runtime <- data.frame(
