@@ -11,19 +11,22 @@ run_mint_scenarios(
   py_pbo,
   py_pyrrole,
   py_ppf,
-  prev_vec,
-  Q0_vec,
-  phi_vec,
-  season_vec,
-  routine_vec,
-  irs_vec,
-  irs_future_vec,
-  lsm_vec,
+  net_type_future = NULL,
+  itn_future = NULL,
+  prev,
+  Q0,
+  phi,
+  season,
+  routine,
+  irs,
+  irs_future,
+  lsm,
   eir_models = "xgboost",
   prevalence_models = "LSTM",
   predictor = c("prevalence", "cases"),
   year_start,
-  year_end
+  year_end,
+  scenario_tag = NULL
 )
 }
 \arguments{
@@ -39,27 +42,32 @@ run_mint_scenarios(
 
 \item{py_ppf}{Numeric vector of pyrethroid-PPF net proportions}
 
-\item{prev_vec}{Numeric vector of malaria prevalence levels}
+\item{prev}{Numeric vector of malaria prevalence levels}
 
-\item{Q0_vec}{Numeric vector of Q0 values}
+\item{Q0}{Numeric vector of Q0 values}
 
-\item{phi_vec}{Numeric vector of phi bednet values}
+\item{phi}{Numeric vector of phi bednet values}
 
-\item{season_vec}{Numeric vector of seasonality indicators}
+\item{season}{Numeric vector of seasonality indicators}
 
-\item{routine_vec}{Numeric vector of routine treatment indicators}
+\item{routine}{Numeric vector of routine treatment indicators}
 
-\item{irs_vec}{Numeric vector of current IRS coverage}
+\item{irs}{Numeric vector of current IRS coverage}
 
-\item{irs_future_vec}{Numeric vector of future IRS coverage}
+\item{irs_future}{Numeric vector of future IRS coverage}
 
-\item{lsm_vec}{Numeric vector of LSM coverage}
+\item{lsm}{Numeric vector of LSM coverage}
 
 \item{eir_models}{Character vector of models to use for EIR prediction (default: "xgboost")}
 
 \item{prevalence_models}{Character vector of models for prevalence prediction (default: "LSTM")}
 
 \item{predictor}{Character vector of predictors to run (default: c("prevalence", "cases"))}
+
+\item{year_start, year_end}{Integers for case-year range}
+
+\item{scenario_tag}{Optional character vector of scenario identifiers. If provided,
+it must have length equal to the number of scenarios. Defaults to "Scenario1", "Scenario2", ...}
 }
 \value{
 List of prevalence and cases predictions
