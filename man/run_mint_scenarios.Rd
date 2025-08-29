@@ -77,6 +77,8 @@ run_mint_scenarios(
 it must have length equal to the number of scenarios. Defaults to "Scenario1", "Scenario2", ...}
 
 \item{cull_prevalence}{Optional integer vector to remove the first X years worth of simulation and aggregate}
+
+\item{output_time}{Optional bool to cull absolute time tracking from output objects}
 }
 \value{
 List of prevalence and cases predictions

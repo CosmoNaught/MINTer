@@ -24,6 +24,7 @@
 #' @param scenario_tag Optional character vector of scenario identifiers. If provided,
 #'   it must have length equal to the number of scenarios. Defaults to "Scenario1", "Scenario2", ...
 #' @param cull_prevalence Optional integer vector to remove the first X years worth of simulation and aggregate 
+#' @param output_time Optional bool to cull absolute time tracking from output objects
 #'
 #' @return List of prevalence and cases predictions
 #' @export
