@@ -24,9 +24,10 @@ run_mint_scenarios(
   eir_models = "xgboost",
   prevalence_models = "LSTM",
   predictor = c("prevalence", "cases"),
-  year_start,
-  year_end,
-  scenario_tag = NULL
+  year_start = 2,
+  year_end = 5,
+  scenario_tag = NULL,
+  cull_prevalence = NULL
 )
 }
 \arguments{
@@ -41,6 +42,11 @@ run_mint_scenarios(
 \item{py_pyrrole}{Numeric vector of pyrethroid-pyrrole net proportions}
 
 \item{py_ppf}{Numeric vector of pyrethroid-PPF net proportions}
+
+\item{net_type_future}{Character vector of future net choices per scenario
+(allowed: "py_only","py_pbo","py_pyrrole","py_ppf"); use NA for baseline.}
+
+\item{itn_future}{Numeric vector (0–1) of future ITN coverage per scenario; use NA for baseline.}
 
 \item{prev}{Numeric vector of malaria prevalence levels}
 
@@ -66,7 +72,9 @@ run_mint_scenarios(
 
 \item{year_start, year_end}{Integers for case-year range}
 
-\item{scenario_tag}{Optional character vector of scenario identifiers. If provided,
+\item{scenario_tag}{Optional character vector of scenario identifiers. If provided,}
+
+\item{cull_prevalence}{Optional integer vector to remove the first X years worth of simulation and aggregate
 it must have length equal to the number of scenarios. Defaults to "Scenario1", "Scenario2", ...}
 }
 \value{

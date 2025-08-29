@@ -6,6 +6,9 @@
 #' @param py_pbo Numeric vector of pyrethroid-PBO net proportions
 #' @param py_pyrrole Numeric vector of pyrethroid-pyrrole net proportions
 #' @param py_ppf Numeric vector of pyrethroid-PPF net proportions
+#' @param net_type_future Character vector of future net choices per scenario
+#'   (allowed: "py_only","py_pbo","py_pyrrole","py_ppf"); use NA for baseline.
+#' @param itn_future Numeric vector (0–1) of future ITN coverage per scenario; use NA for baseline.
 #' @param prev Numeric vector of malaria prevalence levels
 #' @param Q0 Numeric vector of Q0 values
 #' @param phi Numeric vector of phi bednet values
@@ -19,12 +22,12 @@
 #' @param predictor Character vector of predictors to run (default: c("prevalence", "cases"))
 #' @param year_start,year_end Integers for case-year range
 #' @param scenario_tag Optional character vector of scenario identifiers. If provided,
-#' it must have length equal to the number of scenarios. Defaults to "Scenario1", "Scenario2", ...
+#' @param cull_prevalence Optional integer vector to remove the first X years worth of simulation and aggregate 
+#'   it must have length equal to the number of scenarios. Defaults to "Scenario1", "Scenario2", ...
 #'
 #' @return List of prevalence and cases predictions
 #' @export
 run_mint_scenarios <- function(
-  # Net combination settings
   res_use,
   res_future = NULL,
   py_only,
@@ -33,7 +36,6 @@ run_mint_scenarios <- function(
   py_ppf,
   net_type_future = NULL,
   itn_future = NULL,
-  # Malaria environment settings
   prev,
   Q0,
   phi,
@@ -42,17 +44,16 @@ run_mint_scenarios <- function(
   irs,
   irs_future,
   lsm,
-  # Model settings (with defaults)
   eir_models = "xgboost",
   prevalence_models = "LSTM",
   predictor = c("prevalence", "cases"),
-  year_start,
-  year_end,
-  # NEW
-  scenario_tag = NULL
-) {
+  year_start = 2,
+  year_end = 5,
+  scenario_tag = NULL,
+  cull_prevalence = NULL
+  ) {
 
-  # Validate scenario vector lengths
+  # ---- Validate scenario vector lengths and defaults for future resistance and ITN/net choices ----
   n_scenarios <- length(res_use)
   if (length(py_only)    != n_scenarios ||
       length(py_pbo)     != n_scenarios ||
@@ -60,22 +61,36 @@ run_mint_scenarios <- function(
       length(py_ppf)     != n_scenarios) {
     stop("All net combination vectors must have the same length as res_use (", n_scenarios, ").")
   }
-
   if (!is.null(res_future) && length(res_future) > 0 && length(res_future) != n_scenarios) {
     stop("If provided, res_future must have length ", n_scenarios, ".")
   }
-
-  # If either future net selector is provided, require both and validate lengths
-  if (!is.null(net_type_future) || !is.null(itn_future)) {
-    if (is.null(net_type_future) || is.null(itn_future)) {
-      stop("If specifying a future net type, provide both `net_type_future` and `itn_future`.")
-    }
+  allowed_net_types <- c("py_only", "py_pbo", "py_pyrrole", "py_ppf")
+  if (is.null(net_type_future) && is.null(itn_future)) {
+    net_type_future <- rep(NA_character_, n_scenarios)
+    itn_future      <- rep(NA_real_,      n_scenarios)
+  } else {
+    if (is.null(net_type_future)) net_type_future <- rep(NA_character_, n_scenarios)
+    if (is.null(itn_future))      itn_future      <- rep(NA_real_,      n_scenarios)
     if (length(net_type_future) != n_scenarios || length(itn_future) != n_scenarios) {
-      stop("`net_type_future` and `itn_future` must each have length ", n_scenarios, ".")
+      stop("`net_type_future` and `itn_future` must each have length ", n_scenarios, " (or be NULL).")
+    }
+    bad_type_idx <- which(!is.na(net_type_future) & !net_type_future %in% allowed_net_types)
+    if (length(bad_type_idx)) {
+      stop("Unknown `net_type_future` at positions: ",
+           paste(bad_type_idx, collapse = ", "),
+           ". Allowed: ", paste(allowed_net_types, collapse = ", "), ".")
+    }
+    bad_itn_idx <- which(!is.na(itn_future) & (itn_future < 0 | itn_future > 1))
+    if (length(bad_itn_idx)) {
+      stop("`itn_future` must be between 0 and 1 where provided. Bad positions: ",
+           paste(bad_itn_idx, collapse = ", "), ".")
     }
   }
+  if (is.null(res_future) || length(res_future) == 0) {
+    res_future <- res_use
+  }
 
-  # Malaria environment vectors
+  # ---- Validate malaria-environment vectors and predictors, assign scenario IDs ----
   n_settings <- length(prev)
   if (length(Q0)         != n_settings ||
       length(phi)        != n_settings ||
@@ -86,16 +101,7 @@ run_mint_scenarios <- function(
       length(lsm)        != n_settings) {
     stop("All malaria environment vectors must have the same length as prev (", n_settings, ").")
   }
-
-  # Resistance default: if not supplied, carry over current resistance
-  if (is.null(res_future) || length(res_future) == 0) {
-    res_future <- res_use
-  }
-
-  # Validate predictors
   predictor <- match.arg(predictor, c("prevalence", "cases"), several.ok = TRUE)
-
-  # Scenario identifiers (NEW)
   scenario_ids <- if (is.null(scenario_tag)) {
     paste0("Scenario", seq_len(n_scenarios))
   } else {
@@ -105,50 +111,47 @@ run_mint_scenarios <- function(
     as.character(scenario_tag)
   }
 
-  # Load pretrained models
+  # ---- Load pretrained models needed for EIR prediction ----
   pretrained <- estiMINT::load_pretrained_eir_models()
 
-  # Internal function to run a single scenario
+  # ---- Core per-scenario execution: compute net effects, predict EIR, build scenarios, run emulators ----
   run_single_scenario <- function(i) {
 
-    # Calculate net effectiveness for current and future
+    # ---- Compute current and future net effectiveness for this scenario ----
     net_now <- calculate_overall_dn0(
-      resistance_level   = res_use[i],
-      pyrethroid_only    = py_only[i],
-      pyrethroid_pbo     = py_pbo[i],
-      pyrethroid_pyrrole = py_pyrrole[i],
-      pyrethroid_ppf     = py_ppf[i]
+      resistance_level = res_use[i],
+      py_only    = py_only[i],
+      py_pbo     = py_pbo[i],
+      py_pyrrole = py_pyrrole[i],
+      py_ppf     = py_ppf[i]
     )
-
-    if (is.null(net_type_future)) {
+    if (is.na(net_type_future[i]) || is.na(itn_future[i])) {
       net_next <- calculate_overall_dn0(
-        resistance_level   = res_future[i],
-        pyrethroid_only    = py_only[i],
-        pyrethroid_pbo     = py_pbo[i],
-        pyrethroid_pyrrole = py_pyrrole[i],
-        pyrethroid_ppf     = py_ppf[i]
+        resistance_level = res_future[i],
+        py_only    = py_only[i],
+        py_pbo     = py_pbo[i],
+        py_pyrrole = py_pyrrole[i],
+        py_ppf     = py_ppf[i]
       )
     } else {
-      # User picked a specific future net type
       pyo <- pypbo <- pypyr <- pppf <- 0
       switch(net_type_future[i],
-        pyrethroid_only    = { pyo   <- itn_future[i] },
-        pyrethroid_pbo     = { pypbo <- itn_future[i] },
-        pyrethroid_pyrrole = { pypyr <- itn_future[i] },
-        pyrethroid_ppf     = { pppf  <- itn_future[i] },
-        { stop("Unknown net_type_future '", net_type_future[i], "'.") }
+        py_only    = { pyo   <- itn_future[i] },
+        py_pbo     = { pypbo <- itn_future[i] },
+        py_pyrrole = { pypyr <- itn_future[i] },
+        py_ppf     = { pppf  <- itn_future[i] },
+        { stop("Unknown net_type_future '", net_type_future[i], "' at index ", i, ".") }
       )
-
       net_next <- calculate_overall_dn0(
-        resistance_level   = res_future[i],
-        pyrethroid_only    = pyo,
-        pyrethroid_pbo     = pypbo,
-        pyrethroid_pyrrole = pypyr,
-        pyrethroid_ppf     = pppf
+        resistance_level = res_future[i],
+        py_only    = pyo,
+        py_pbo     = pypbo,
+        py_pyrrole = pypyr,
+        py_ppf     = pppf
       )
     }
 
-    # Prepare runtime data for EIR prediction
+    # ---- Assemble runtime features, predict initial EIR using selected models, average across models ----
     runtime <- data.frame(
       prevalence  = prev[i],
       dn0_use     = net_now$dn0,
@@ -159,8 +162,6 @@ run_mint_scenarios <- function(
       itn_use     = net_now$itn_use,
       irs_use     = irs[i]
     )
-
-    # Calculate EIR using specified models
     eir_predictions <- list()
     if ("xgboost" %in% eir_models) {
       eir_predictions$xgboost <- estiMINT::predict_initial_eir(
@@ -177,7 +178,7 @@ run_mint_scenarios <- function(
     }
     eir <- Reduce(`+`, eir_predictions) / length(eir_predictions)
 
-    # Create scenarios
+    # ---- Build full intervention scenarios for emulator inputs ----
     scen <- create_scenarios(
       eir          = eir,
       dn0_use      = net_now$dn0,
@@ -193,8 +194,9 @@ run_mint_scenarios <- function(
       lsm          = lsm[i]
     )
 
-    # Run emulator for each predictor
+    # ---- Run emulators for requested predictors; post-process prevalence (cull first 2 years, optional window-avg) ----
     results <- list()
+
 
     if ("prevalence" %in% predictor) {
       results$prevalence <- run_malaria_emulator(
@@ -202,12 +204,26 @@ run_mint_scenarios <- function(
         predictor   = "prevalence",
         model_types = prevalence_models
       )
-      results$prevalence$scenario <- scenario_ids[i]  # NEW
+
+    if (!is.null(cull_prevalence)) {
+      drop_n <- pmax(0L, as.integer(cull_prevalence[1])) * 365L
+      k      <- pmax(1L, as.integer(cull_prevalence[2]))
+      results$prevalence <- results$prevalence |>
+        dplyr::slice(-(seq_len(pmin(dplyr::n(), drop_n)))) |>
+        dplyr::group_by(bin = (dplyr::row_number() - 1L) %/% k) |>
+        dplyr::summarise(
+          timestep   = dplyr::first(timestep),
+          prevalence = mean(prevalence, na.rm = TRUE),
+          .groups    = "drop"
+        ) |>
+        dplyr::select(timestep, prevalence)  # <— removes the bin column
+    }
+    results$prevalence$scenario <- scenario_ids[i]
+
     }
 
     if ("cases" %in% predictor) {
       pretrained_cases <- estiMINT::load_pretrained_case_models()
-
       years <- year_start:year_end
       new_data_cases <- tidyr::crossing(scen, year = years)
 
@@ -229,18 +245,17 @@ run_mint_scenarios <- function(
         rf_model, new_data_cases, pretrained_cases$feature_cols
       )
 
-      new_data_cases$ensemble_cases_per_1000 <- (xgb_predictions + rf_predictions) / 2
+      new_data_cases$cases_per_1000 <- (xgb_predictions + rf_predictions) / 2
+      new_data_cases$scenario <- scenario_ids[i]
       results$cases <- new_data_cases
-      results$cases$scenario <- scenario_ids[i]       # NEW
     }
 
     results
   }
 
-  # Run all scenarios
+  # ---- Execute all scenarios and bind results with scenario indexing ----
   runs <- lapply(seq_len(n_scenarios), run_single_scenario)
 
-  # Combine results
   out <- list()
   if ("prevalence" %in% predictor) {
     out$prevalence <- do.call(rbind, lapply(runs, `[[`, "prevalence")) |>
@@ -252,8 +267,10 @@ run_mint_scenarios <- function(
     out$cases <- do.call(rbind, lapply(runs, `[[`, "cases")) |>
       dplyr::group_by(scenario) |>
       dplyr::mutate(index = dplyr::cur_group_id()) |>
-      dplyr::ungroup()
+      dplyr::ungroup() |>
+      dplyr::select("year", "cases_per_1000", "scenario")
   }
 
+  # ---- Return combined prevalence and/or cases as requested ----
   out
 }
