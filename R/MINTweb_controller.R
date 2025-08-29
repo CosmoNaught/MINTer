@@ -22,8 +22,8 @@
 #' @param predictor Character vector of predictors to run (default: c("prevalence", "cases"))
 #' @param year_start,year_end Integers for case-year range
 #' @param scenario_tag Optional character vector of scenario identifiers. If provided,
-#' @param cull_prevalence Optional integer vector to remove the first X years worth of simulation and aggregate 
 #'   it must have length equal to the number of scenarios. Defaults to "Scenario1", "Scenario2", ...
+#' @param cull_prevalence Optional integer vector to remove the first X years worth of simulation and aggregate 
 #'
 #' @return List of prevalence and cases predictions
 #' @export
@@ -50,7 +50,8 @@ run_mint_scenarios <- function(
   year_start = 2,
   year_end = 5,
   scenario_tag = NULL,
-  cull_prevalence = NULL
+  cull_prevalence = c(2, 7),
+  output_time = FALSE
   ) {
 
   # ---- Validate scenario vector lengths and defaults for future resistance and ITN/net choices ----
@@ -270,6 +271,17 @@ run_mint_scenarios <- function(
       dplyr::ungroup() |>
       dplyr::select("year", "cases_per_1000", "scenario")
   }
+
+  if (!output_time) {
+  if ("prevalence" %in% predictor && !is.null(out$prevalence)) {
+    out$prevalence <- out$prevalence |>
+      dplyr::select(-dplyr::any_of(c("timestep", "index")))
+  }
+  if ("cases" %in% predictor && !is.null(out$cases)) {
+    out$cases <- out$cases |>
+      dplyr::select(-dplyr::any_of("year"))
+  }
+}
 
   # ---- Return combined prevalence and/or cases as requested ----
   out

@@ -27,7 +27,8 @@ run_mint_scenarios(
   year_start = 2,
   year_end = 5,
   scenario_tag = NULL,
-  cull_prevalence = NULL
+  cull_prevalence = c(2, 7),
+  output_time = FALSE
 )
 }
 \arguments{
@@ -72,10 +73,10 @@ run_mint_scenarios(
 
 \item{year_start, year_end}{Integers for case-year range}
 
-\item{scenario_tag}{Optional character vector of scenario identifiers. If provided,}
-
-\item{cull_prevalence}{Optional integer vector to remove the first X years worth of simulation and aggregate
+\item{scenario_tag}{Optional character vector of scenario identifiers. If provided,
 it must have length equal to the number of scenarios. Defaults to "Scenario1", "Scenario2", ...}
+
+\item{cull_prevalence}{Optional integer vector to remove the first X years worth of simulation and aggregate}
 }
 \value{
 List of prevalence and cases predictions
