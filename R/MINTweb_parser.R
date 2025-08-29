@@ -118,11 +118,35 @@ calculate_overall_dn0 <- function(resistance_level,
   if (!is.numeric(usage_values))
     stop("Usage values must be numeric", call. = FALSE)
 
-  valid_types <- available_net_types(itn_params_path)
-  unknown      <- setdiff(names(usage_values), valid_types)
+  # --- NEW: normalize short names to canonical RDS names ---------------------
+  canonical_map <- c(
+    "py_only"            = "pyrethroid_only",
+    "pyrethroid_only"    = "pyrethroid_only",
+    "py_pbo"             = "pyrethroid_pbo",
+    "pyrethroid_pbo"     = "pyrethroid_pbo",
+    "py_pyrrole"         = "pyrethroid_pyrrole",
+    "pyrethroid_pyrrole" = "pyrethroid_pyrrole",
+    "py_ppf"             = "pyrethroid_ppf",
+    "pyrethroid_ppf"     = "pyrethroid_ppf"
+  )
 
+  orig_names <- names(usage_values)
+  lower_orig <- tolower(orig_names)
+  canonical  <- unname(canonical_map[lower_orig])
+
+  if (anyNA(canonical)) {
+    bad <- unique(orig_names[is.na(canonical)])
+    stop("Unknown net type(s): ", paste(bad, collapse = ", "), call. = FALSE)
+  }
+
+  names(usage_values) <- canonical
+  # --------------------------------------------------------------------------
+
+  # Validate against what’s actually in the RDS
+  valid_types <- tolower(available_net_types(itn_params_path))
+  unknown <- setdiff(tolower(names(usage_values)), valid_types)
   if (length(unknown) > 0) {
-    stop("Unknown net type(s): ",
+    stop("Net types not present in ITN parameter file: ",
          paste(unknown, collapse = ", "),
          call. = FALSE)
   }
@@ -131,10 +155,11 @@ calculate_overall_dn0 <- function(resistance_level,
                                  itn_params_path = itn_params_path,
                                  strict = strict)
 
-  dn0_val  <- resistance_to_overall_dn0(splines,
-                                        usage_values,
-                                        resistance_level)
+  dn0_val <- resistance_to_overall_dn0(splines,
+                                       usage_values,
+                                       resistance_level)
 
+  # Keep canonical logic: pyrethroid-based nets start with "pyrethroid"
   itn_use_val <- sum(
     usage_values[grepl("^pyrethroid", names(usage_values), ignore.case = TRUE)],
     na.rm = TRUE
