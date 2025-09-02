@@ -67,6 +67,7 @@ run_mint_scenarios <- function(
     stop("If provided, res_future must have length ", n_scenarios, ".")
   }
   allowed_net_types <- c("py_only", "py_pbo", "py_pyrrole", "py_ppf")
+
   if (is.null(net_type_future) && is.null(itn_future)) {
     net_type_future <- rep(NA_character_, n_scenarios)
     itn_future      <- rep(NA_real_,      n_scenarios)
@@ -76,6 +77,9 @@ run_mint_scenarios <- function(
     if (length(net_type_future) != n_scenarios || length(itn_future) != n_scenarios) {
       stop("`net_type_future` and `itn_future` must each have length ", n_scenarios, " (or be NULL).")
     }
+
+    net_type_future[!is.na(itn_future) & itn_future == 0] <- NA_character_
+
     bad_type_idx <- which(!is.na(net_type_future) & !net_type_future %in% allowed_net_types)
     if (length(bad_type_idx)) {
       stop("Unknown `net_type_future` at positions: ",
@@ -127,7 +131,16 @@ run_mint_scenarios <- function(
       py_pyrrole = py_pyrrole[i],
       py_ppf     = py_ppf[i]
     )
-    if (is.na(net_type_future[i]) || is.na(itn_future[i])) {
+
+    if (all(c(py_only[i], py_pbo[i], py_pyrrole[i], py_ppf[i]) == 0)) {
+      net_now$itn_use <- 0
+      net_now$dn0     <- 0
+    }
+
+    if (!is.na(itn_future[i]) && itn_future[i] == 0) {
+
+      net_next <- list(dn0 = 0, itn_use = 0)
+    } else if (is.na(net_type_future[i]) || is.na(itn_future[i])) {
       net_next <- calculate_overall_dn0(
         resistance_level = res_future[i],
         py_only    = py_only[i],
@@ -141,8 +154,7 @@ run_mint_scenarios <- function(
         py_only    = { pyo   <- itn_future[i] },
         py_pbo     = { pypbo <- itn_future[i] },
         py_pyrrole = { pypyr <- itn_future[i] },
-        py_ppf     = { pppf  <- itn_future[i] },
-        { stop("Unknown net_type_future '", net_type_future[i], "' at index ", i, ".") }
+        py_ppf     = { pppf  <- itn_future[i] }
       )
       net_next <- calculate_overall_dn0(
         resistance_level = res_future[i],
