@@ -67,10 +67,7 @@ resistance_to_dn0 <- function(spline_fit, resistance_level) {
 #' @param resistance_level Numeric resistance level to calculate dn0 for
 #' @return Weighted average dn0 value
 #' @export
-resistance_to_overall_dn0 <- function(splines,
-                                      usage_values,
-                                      resistance_level) {
-
+resistance_to_overall_dn0 <- function(splines, usage_values, resistance_level) {
   net_types <- names(splines)
 
   if (!all(names(usage_values) %in% net_types)) {
@@ -80,12 +77,18 @@ resistance_to_overall_dn0 <- function(splines,
     stop("usage_values must supply one weight for each spline")
   }
 
+  # NEW: handle zero-weight mix
+  if (sum(usage_values[net_types], na.rm = TRUE) == 0) {
+    return(0)
+  }
+
   dn0_values <- vapply(net_types, function(nt) {
     predict(splines[[nt]], x = resistance_level)$y
   }, numeric(1))
 
   weighted.mean(dn0_values, usage_values[net_types])
 }
+
 
 #' Calculate overall dn0 in a single call
 #'
