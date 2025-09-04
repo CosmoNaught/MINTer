@@ -23,12 +23,10 @@
 #' @param year_start,year_end Integers for case-year range
 #' @param scenario_tag Optional character vector of scenario identifiers. If provided,
 #'   it must have length equal to the number of scenarios. Defaults to "Scenario1", "Scenario2", ...
-#' @param cull_prevalence Optional integer vector to remove the first X years worth of simulation and aggregate 
-#' @param output_time Optional bool to cull absolute time tracking from output objects
 #'
 #' @return List of prevalence and cases predictions
 #' @export
-run_mintweb_scenarios <- function(
+run_minter_scenarios <- function(
   res_use,
   res_future = NULL,
   py_only,
@@ -50,9 +48,7 @@ run_mintweb_scenarios <- function(
   predictor = c("prevalence", "cases"),
   year_start = 2,
   year_end = 5,
-  scenario_tag = NULL,
-  cull_prevalence = c(2, 7),
-  output_time = FALSE
+  scenario_tag = NULL
   ) {
 
   # ---- Validate scenario vector lengths and defaults for future resistance and ITN/net choices ----
@@ -208,9 +204,8 @@ run_mintweb_scenarios <- function(
       lsm          = lsm[i]
     )
 
-    # ---- Run emulators for requested predictors; post-process prevalence (cull first 2 years, optional window-avg) ----
+    # ---- Run emulators for requested predictors (raw output, no culling) ----
     results <- list()
-
 
     if ("prevalence" %in% predictor) {
       results$prevalence <- run_malaria_emulator(
@@ -218,22 +213,7 @@ run_mintweb_scenarios <- function(
         predictor   = "prevalence",
         model_types = prevalence_models
       )
-
-    if (!is.null(cull_prevalence)) {
-      drop_n <- pmax(0L, as.integer(cull_prevalence[1])) * 365L
-      k      <- pmax(1L, as.integer(cull_prevalence[2]))
-      results$prevalence <- results$prevalence |>
-        dplyr::slice(-(seq_len(pmin(dplyr::n(), drop_n)))) |>
-        dplyr::group_by(bin = (dplyr::row_number() - 1L) %/% k) |>
-        dplyr::summarise(
-          timestep   = dplyr::first(timestep),
-          prevalence = mean(prevalence, na.rm = TRUE),
-          .groups    = "drop"
-        ) |>
-        dplyr::select(timestep, prevalence)  # <— removes the bin column
-    }
-    results$prevalence$scenario <- scenario_ids[i]
-
+      results$prevalence$scenario <- scenario_ids[i]
     }
 
     if ("cases" %in% predictor) {
@@ -285,17 +265,6 @@ run_mintweb_scenarios <- function(
       dplyr::select("year", "cases_per_1000", "scenario")
   }
 
-  if (!output_time) {
-  if ("prevalence" %in% predictor && !is.null(out$prevalence)) {
-    out$prevalence <- out$prevalence |>
-      dplyr::select(-dplyr::any_of(c("timestep", "index")))
-  }
-  if ("cases" %in% predictor && !is.null(out$cases)) {
-    out$cases <- out$cases |>
-      dplyr::select(-dplyr::any_of("year"))
-  }
-}
-
-  # ---- Return combined prevalence and/or cases as requested ----
+  # ---- Return raw prevalence and/or cases as requested ----
   out
 }
