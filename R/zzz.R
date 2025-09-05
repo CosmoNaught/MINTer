@@ -24,10 +24,10 @@ sklearn <- NULL
   assign("sklearn", reticulate::import("sklearn", delay_load = TRUE),
          envir = parent.env(environment()))
   
-  # Pre-load all models in background (non-blocking)
-
-  preload_all_models(verbose = TRUE)
-
+  # Only preload if not during R CMD INSTALL!!!!!
+  if (!identical(Sys.getenv("R_INSTALL_PKG"), "MINTer")) {
+    preload_all_models(verbose = TRUE)
+  }
 }
 
 #' Preload All Models
