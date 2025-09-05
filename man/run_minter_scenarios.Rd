@@ -2,7 +2,7 @@
 % Please edit documentation in R/MINTer_controller.R
 \name{run_minter_scenarios}
 \alias{run_minter_scenarios}
-\title{Run MINT Scenarios for Malaria Intervention Analysis}
+\title{Optimized Run MINT Scenarios for Malaria Intervention Analysis}
 \usage{
 run_minter_scenarios(
   res_use,
@@ -26,7 +26,10 @@ run_minter_scenarios(
   predictor = c("prevalence", "cases"),
   year_start = 2,
   year_end = 5,
-  scenario_tag = NULL
+  scenario_tag = NULL,
+  benchmark = TRUE,
+  preload_models = TRUE,
+  use_cache = TRUE
 )
 }
 \arguments{
@@ -42,10 +45,9 @@ run_minter_scenarios(
 
 \item{py_ppf}{Numeric vector of pyrethroid-PPF net proportions}
 
-\item{net_type_future}{Character vector of future net choices per scenario
-(allowed: "py_only","py_pbo","py_pyrrole","py_ppf"); use NA for baseline.}
+\item{net_type_future}{Character vector of future net choices per scenario}
 
-\item{itn_future}{Numeric vector (0–1) of future ITN coverage per scenario; use NA for baseline.}
+\item{itn_future}{Numeric vector (0 - 1) of future ITN coverage per scenario}
 
 \item{prev}{Numeric vector of malaria prevalence levels}
 
@@ -63,20 +65,25 @@ run_minter_scenarios(
 
 \item{lsm}{Numeric vector of LSM coverage}
 
-\item{eir_models}{Character vector of models to use for EIR prediction (default: "xgboost")}
+\item{eir_models}{Character vector of models to use for EIR prediction}
 
-\item{prevalence_models}{Character vector of models for prevalence prediction (default: "LSTM")}
+\item{prevalence_models}{Character vector of models for prevalence prediction}
 
-\item{predictor}{Character vector of predictors to run (default: c("prevalence", "cases"))}
+\item{predictor}{Character vector of predictors to run}
 
 \item{year_start, year_end}{Integers for case-year range}
 
-\item{scenario_tag}{Optional character vector of scenario identifiers. If provided,
-it must have length equal to the number of scenarios. Defaults to "Scenario1", "Scenario2", ...}
+\item{scenario_tag}{Optional character vector of scenario identifiers}
+
+\item{benchmark}{Logical flag to track execution times}
+
+\item{preload_models}{Preload all models at start (default TRUE)}
+
+\item{use_cache}{Use cached models (default TRUE)}
 }
 \value{
-List of prevalence and cases predictions
+List of prevalence and cases predictions, plus benchmark times if benchmark=TRUE
 }
 \description{
-Run MINT Scenarios for Malaria Intervention Analysis
+Optimized Run MINT Scenarios for Malaria Intervention Analysis
 }

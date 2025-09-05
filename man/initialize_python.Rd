@@ -2,15 +2,13 @@
 % Please edit documentation in R/zzz.R
 \name{initialize_python}
 \alias{initialize_python}
-\title{Initialize Python Dependencies}
+\title{Initialize Python with Model Helpers}
 \usage{
 initialize_python(verbose = TRUE)
 }
 \arguments{
-\item{verbose}{Logical, whether to print messages (default: TRUE)}
+\item{verbose}{Print messages}
 }
 \description{
-This function initialises the Python dependencies required for the emulator.
-It is called automatically when needed, but can be called manually to
-pre-load the dependencies.
+Initialize Python with Model Helpers
 }

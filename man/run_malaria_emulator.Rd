@@ -2,7 +2,7 @@
 % Please edit documentation in R/emulator_main.R
 \name{run_malaria_emulator}
 \alias{run_malaria_emulator}
-\title{Run Malaria Emulator}
+\title{Optimized Run Malaria Emulator with Batching}
 \usage{
 run_malaria_emulator(
   db_path = NULL,
@@ -14,34 +14,39 @@ run_malaria_emulator(
   window_size = 14,
   device = NULL,
   model_types = c("GRU", "LSTM"),
-  time_steps = 2190
+  time_steps = 2190,
+  use_cache = TRUE,
+  benchmark = FALSE
 )
 }
 \arguments{
 \item{db_path}{Path to DuckDB database (for database mode)}
 
-\item{param_index}{Parameter index for database mode (NULL for random selection)}
+\item{param_index}{Parameter index for database mode (NULL for random)}
 
 \item{scenarios}{Data frame with scenario parameters (for scenario mode)}
 
 \item{predictor}{"prevalence" or "cases"}
 
-\item{models_base_dir}{Base directory with trained models. If NULL (default),
-uses models bundled with the package.}
+\item{models_base_dir}{Base directory with trained models (NULL for bundled)}
 
-\item{counterfactual}{Named list for counterfactual analysis (database mode only)}
+\item{counterfactual}{Named list for counterfactual analysis}
 
 \item{window_size}{Window size for rolling average}
 
 \item{device}{"cpu" or "cuda"}
 
-\item{model_types}{Vector of model types to use ("GRU", "LSTM", or both)}
+\item{model_types}{Vector of model types ("GRU", "LSTM", or both)}
 
 \item{time_steps}{Number of time steps for predictions (in days)}
+
+\item{use_cache}{Use cached models (default TRUE)}
+
+\item{benchmark}{Track detailed timing (default FALSE)}
 }
 \value{
 Data frame with columns: index, timestep, value, model_type
 }
 \description{
-Runs malaria emulator in either database mode or scenario mode.
+Optimized Run Malaria Emulator with Batching
 }

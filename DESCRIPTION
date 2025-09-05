@@ -30,6 +30,7 @@ Imports:
     stats,
     rlang,
     estiMINT,
+    later,
     cli
 Suggests:
     testthat (>= 3.0.0),

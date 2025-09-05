@@ -1,0 +1,41 @@
+available_net_types     Return the vector of net types contained in an
+                        ITN-parameter file
+calculate_overall_dn0   Calculate overall dn0 in a single call
+create_malariasim_scenarios
+                        Create scenarios for Malaria Simulation
+create_scenario_plots   Create Scenario Plots from Emulator Results
+create_scenarios        Create Scenarios for Emulator
+create_unified_plot     Create Unified Plot for Emulator Results
+define_bednet_types     Define bednet types and create spline fits
+fetch_rolling_data      Fetch Rolling Data from DuckDB
+generate_scenario_predictions
+                        Generate Scenario Predictions
+get_runtime_parameters
+                        Get Runtime Parameters for Simulation
+initialize_python       Initialize Python Dependencies
+initialize_simulation_parameters
+                        Initialize Simulation Parameters
+list_available_parameters
+                        List Available Parameters in Database
+load_emulator_models    Load Emulator Models
+local_cluster_malariasim_controller
+                        Run Malaria Simulation with Local Cluster
+local_malariasim_controller
+                        Run Malaria Simulation Locally
+resistance_to_dn0       Convert resistance level to dn0 using spline
+                        fit
+resistance_to_overall_dn0
+                        Calculate weighted average dn0 across net types
+run_emulator            Run Emulator for a Parameter
+run_malaria_emulator    Run Malaria Emulator
+run_malariasim          Run Malaria Simulations
+run_minter_scenarios    Run MINT Scenarios for Malaria Intervention
+                        Analysis
+run_mintweb_scenarios   Run MINT Scenarios for Malaria Intervention
+                        Analysis
+set_bednet_parameters   Set Bednet Parameters
+set_irs_parameters      Set IRS Parameters
+set_lsm_parameters      Set LSM Parameters
+set_mosquito_parameters
+                        Set Mosquito Parameters
+set_seasonality         Set Seasonality Parameters
