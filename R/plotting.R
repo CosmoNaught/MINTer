@@ -1,145 +1,111 @@
-
 #' Create Scenario Plots from Emulator Results
 #'
-#' Creates plots for each scenario from emulator results dataframe.
+#' Creates plots for scenarios from emulator results dataframe.
+#' Can create either individual plots per scenario or combined plot.
 #'
-#' @param results Data frame from run_malaria_emulator
+#' @param results Data frame with columns: index, timestep, prevalence/cases, model_type, scenario
 #' @param output_dir Directory to save plots (optional)
+#' @param plot_type "individual", "combined", or "both" (default "both")
+#' @param predictor "prevalence" or "cases" (auto-detected if NULL)
+#' @param window_size Days per timestep (default 14)
 #' @param plot_tight Use tight y-axis scaling (default FALSE)
 #'
 #' @return List of ggplot objects
 #' @export
-create_scenario_plots <- function(results, output_dir = NULL, plot_tight = FALSE) {
+create_scenario_plots <- function(results, 
+                                  output_dir = NULL, 
+                                  plot_type = "both",
+                                  predictor = NULL,
+                                  window_size = 14,
+                                  plot_tight = FALSE) {
   
-  # Extract metadata from attributes
-  predictor <- attr(results, "predictor")
-  scenarios <- attr(results, "scenarios")
-  model_types <- attr(results, "model_types")
-  window_size <- attr(results, "window_size")
-  mode <- attr(results, "mode")
-  param_index <- attr(results, "param_index")
-  global_index <- attr(results, "global_index")
-  parameters <- attr(results, "parameters")
-  counterfactual <- attr(results, "counterfactual")
+  library(ggplot2)
+  library(dplyr)
   
-  # If attributes are missing, try to infer
+  # Auto-detect predictor if not specified
   if (is.null(predictor)) {
     if ("prevalence" %in% names(results)) {
       predictor <- "prevalence"
     } else if ("cases" %in% names(results)) {
       predictor <- "cases"
     } else {
-      stop("Cannot determine predictor type from results")
+      stop("Cannot determine predictor type. Please specify 'prevalence' or 'cases'.")
     }
   }
-  
-  if (is.null(window_size)) {
-    window_size <- 14  # default
-  }
-  
-  # Get unique scenarios
-  unique_indices <- unique(results$index)
   
   # Create output directory if needed
   if (!is.null(output_dir)) {
     dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
   }
   
+  # Calculate timestep range for years 2-6
+  # Year 2 starts at day 730, which is timestep 730/14 ≈ 52.14
+  # Year 6 ends at day 2190, which is timestep 2190/14 ≈ 156.43
+  start_timestep <- ceiling(730 / window_size)  # 53
+  end_timestep <- floor(2190 / window_size)     # 156
+  
+  # Filter to years 2-6 and prepare data
+  plot_data <- results %>%
+    filter(timestep >= start_timestep & timestep <= end_timestep) %>%
+    mutate(
+      # Convert timesteps to years, then shift so year 2 becomes year 0
+      years_raw = (timestep * window_size) / 365,
+      years = years_raw - 2  # Shift so year 2 becomes 0
+    )
+  
+  # Check if scenario column exists
+  has_scenarios <- "scenario" %in% names(plot_data)
+  
+  if (!has_scenarios) {
+    # If no scenario column, treat each index as a scenario
+    plot_data$scenario <- paste0("Scenario_", plot_data$index)
+  }
+  
   plots <- list()
   
-  # Handle database mode differently
-  if (!is.null(mode) && mode == "database") {
-    # Filter to reasonable timesteps
-    MAX_STEPS <- 156
-    results <- dplyr::filter(results, .data$timestep <= MAX_STEPS)
-    
-    # Prepare plot data
-    plot_df <- data.frame(
-      timestep = results$timestep,
-      value = results[[predictor]],
-      type = results$model_type,
-      simulation = "1"
+  # Create combined plot if requested
+  if (plot_type %in% c("combined", "both")) {
+    p_combined <- create_combined_scenario_plot(
+      plot_data, 
+      predictor, 
+      plot_tight
     )
     
-    # Create title
-    title_text <- sprintf("%s - Parameter Index = %d | Global Index = %d",
-                         ifelse(predictor == "prevalence", "Prevalence", "Cases per 1000"),
-                         param_index, global_index)
+    plots[["combined"]] <- p_combined
     
-    if (!is.null(parameters)) {
-      param_string <- paste(sprintf("%s=%.2g", names(parameters)[1:min(3, length(parameters))], 
-                                   parameters[1:min(3, length(parameters))]), collapse = ", ")
-      if (length(parameters) > 3) {
-        param_string <- paste0(param_string, sprintf(" (+%d more)", length(parameters) - 3))
-      }
-      title_text <- paste0(title_text, "\n", param_string)
-    }
-    
-    # Create the plot
-    p <- create_unified_plot(plot_df, predictor, title_text, window_size, plot_tight)
-    
-    plots[[1]] <- p
-    
-    # Save plot if output directory specified
+    # Save combined plot
     if (!is.null(output_dir)) {
-      filename <- sprintf("%s_parameter_%d_global_%d_%s%s.png",
-                         predictor, param_index, global_index,
-                         paste(tolower(model_types), collapse = "_"),
-                         ifelse(!is.null(counterfactual), "_counterfactual", ""))
+      filename <- sprintf("%s_all_scenarios_combined.png", predictor)
       filepath <- file.path(output_dir, filename)
-      ggplot2::ggsave(filepath, p, width = 10, height = 6, dpi = 300)
-      message(sprintf("[INFO] Saved plot to %s", filename))
+      ggsave(filepath, p_combined, width = 12, height = 8, dpi = 300)
+      message(sprintf("[INFO] Saved combined plot to %s", filename))
     }
+  }
+  
+  # Create individual plots if requested
+  if (plot_type %in% c("individual", "both")) {
+    unique_scenarios <- unique(plot_data$scenario)
     
-  } else {
-    # Handle scenario mode
-    for (idx in unique_indices) {
-      # Filter data for this scenario
-      scenario_data <- results[results$index == idx, ]
+    for (scen in unique_scenarios) {
+      scenario_data <- filter(plot_data, scenario == scen)
       
-      # Prepare plot data
-      plot_df <- data.frame(
-        timestep = scenario_data$timestep,
-        value = scenario_data[[predictor]],
-        type = scenario_data$model_type,
-        simulation = "1"
+      p_individual <- create_individual_scenario_plot(
+        scenario_data,
+        scen,
+        predictor,
+        plot_tight
       )
       
-      # Create parameter label if scenarios available
-      if (!is.null(scenarios) && idx <= nrow(scenarios)) {
-        scenario_params <- scenarios[idx, ]
-        param_labels <- sapply(names(scenario_params), function(param) {
-          sprintf("%s=%.2g", param, scenario_params[[param]])
-        })
-        param_string <- paste(param_labels[1:min(3, length(param_labels))], collapse = ", ")
-        if (length(param_labels) > 3) {
-          param_string <- paste0(param_string, sprintf(" (+%d more)", length(param_labels) - 3))
-        }
-      } else {
-        param_string <- sprintf("Scenario %d", idx)
-      }
+      plots[[scen]] <- p_individual
       
-      # Create plot title
-      title_text <- sprintf("%s Prediction - %s",
-                           ifelse(predictor == "prevalence", "Prevalence", "Cases per 1000"),
-                           param_string)
-      
-      # Create the plot using the existing function
-      p <- create_unified_plot(plot_df, predictor, title_text, window_size, plot_tight)
-      
-      plots[[idx]] <- p
-      
-      # Save plot if output directory specified
+      # Save individual plot
       if (!is.null(output_dir)) {
-        # Get model types for this scenario
-        scenario_models <- unique(scenario_data$model_type)
-        
-        filename <- sprintf("%s_scenario_%03d_%s.png",
-                           predictor, idx,
-                           paste(tolower(scenario_models), collapse = "_"))
+        # Clean scenario name for filename
+        clean_name <- gsub("[^A-Za-z0-9_-]", "_", scen)
+        filename <- sprintf("%s_scenario_%s.png", predictor, clean_name)
         filepath <- file.path(output_dir, filename)
-        ggplot2::ggsave(filepath, p, width = 10, height = 6, dpi = 300)
-        message(sprintf("[INFO] Saved scenario %d plot to %s", idx, filename))
+        ggsave(filepath, p_individual, width = 10, height = 6, dpi = 300)
+        message(sprintf("[INFO] Saved %s plot to %s", scen, filename))
       }
     }
   }
@@ -148,56 +114,174 @@ create_scenario_plots <- function(results, output_dir = NULL, plot_tight = FALSE
 }
 
 
-#' Create Unified Plot for Emulator Results
+#' Create Combined Plot with All Scenarios
 #'
-#' @param plot_data Data frame with timestep, value, type columns
+#' @param plot_data Filtered data frame with years column
 #' @param predictor "prevalence" or "cases"
-#' @param title_text Title for the plot
-#' @param window_size Window size for time scaling
 #' @param plot_tight Use tight y-axis scaling
 #'
 #' @return ggplot object
-#' @export
-create_unified_plot <- function(plot_data, predictor, title_text, 
-                               window_size = 14, plot_tight = FALSE) {
-  MAX_STEPS <- 156
-  # Convert timesteps to years
-  plot_data <- dplyr::filter(plot_data, .data$timestep <= MAX_STEPS)
+create_combined_scenario_plot <- function(plot_data, predictor, plot_tight = FALSE) {
   
-  # Every timestep represents `window_size` days, no matter which predictor
-  plot_data$years <- (plot_data$timestep * window_size) / 365
+  # Define color palette for different scenarios
+  n_scenarios <- length(unique(plot_data$scenario))
+  colors <- scales::hue_pal()(n_scenarios)
   
-  # Create plot
-  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data$years, y = .data$value, color = .data$type)) +
-    ggplot2::geom_vline(xintercept = 3, linetype = "dashed", color = "black", alpha = 0.5) +
-    ggplot2::geom_line(data = dplyr::filter(plot_data, .data$type == "Actual"), 
-              ggplot2::aes(group = .data$simulation), alpha = 0.5, linetype = "dashed") +
-    ggplot2::geom_line(data = dplyr::filter(plot_data, .data$type != "Actual"), 
-              linewidth = 1.2) +
-    ggplot2::scale_x_continuous(
-      breaks = 0:6,
-      limits = c(0, 6),
-      expand = c(0, 0)
+  # Create y-axis label
+  y_label <- ifelse(predictor == "prevalence", "Prevalence", "Cases per 1000")
+  
+  # Base plot
+  p <- ggplot(plot_data, aes(x = years, y = .data[[predictor]], 
+                             color = scenario, linetype = model_type)) +
+    geom_line(size = 1.2, alpha = 0.8) +
+    scale_x_continuous(
+      name = "Years",
+      breaks = 0:4,
+      labels = 0:4,
+      limits = c(0, 4),
+      expand = c(0.02, 0.02)
     ) +
-    ggplot2::labs(
-      title = title_text,
-      x = "Years",
-      y = ifelse(predictor == "prevalence", "Prevalence", "Cases per 1000"),
-      color = "Model"
+    labs(
+      title = sprintf("All Scenarios - %s Predictions", y_label),
+      subtitle = "Years 2-6 of simulation (displayed as 0-4)",
+      y = y_label,
+      color = "Scenario",
+      linetype = "Model"
     ) +
-    ggplot2::theme_minimal() +
-    ggplot2::theme_bw() +
-    ggplot2::theme(
+    theme_minimal() +
+    theme(
       legend.position = "right",
-      panel.background = ggplot2::element_rect(fill = "white", color = NA),
-      plot.background = ggplot2::element_rect(fill = "white", color = NA),
-      legend.background = ggplot2::element_rect(fill = "white", color = NA)
+      legend.box = "vertical",
+      panel.grid.minor = element_blank(),
+      panel.background = element_rect(fill = "white", color = NA),
+      plot.background = element_rect(fill = "white", color = NA),
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 11, color = "gray40"),
+      axis.title = element_text(size = 11),
+      legend.title = element_text(size = 10, face = "bold"),
+      legend.text = element_text(size = 9)
     )
   
-  # Set y-axis limits
-  if (!plot_tight && predictor == "prevalence") {
-    p <- p + ggplot2::ylim(0, 1)
+  # Add vertical line at year 1 (year 3 in original timeline) if it exists
+  if (1 >= 0 && 1 <= 4) {
+    p <- p + geom_vline(xintercept = 1, linetype = "dotted", 
+                       color = "gray50", alpha = 0.5)
+  }
+  
+  # Set y-axis limits based on predictor
+  if (!plot_tight) {
+    if (predictor == "prevalence") {
+      p <- p + scale_y_continuous(limits = c(0, 1), labels = scales::percent_format())
+    } else {
+      # For cases, use data-driven limits
+      y_max <- max(plot_data[[predictor]], na.rm = TRUE) * 1.1
+      p <- p + scale_y_continuous(limits = c(0, y_max))
+    }
+  } else {
+    # Tight scaling
+    if (predictor == "prevalence") {
+      p <- p + scale_y_continuous(labels = scales::percent_format())
+    }
+  }
+  
+  # Adjust legend based on number of scenarios
+  if (n_scenarios > 6) {
+    p <- p + guides(color = guide_legend(ncol = 2))
   }
   
   return(p)
+}
+
+
+#' Create Individual Scenario Plot
+#'
+#' @param scenario_data Filtered data for one scenario
+#' @param scenario_name Name of the scenario
+#' @param predictor "prevalence" or "cases"
+#' @param plot_tight Use tight y-axis scaling
+#'
+#' @return ggplot object
+create_individual_scenario_plot <- function(scenario_data, scenario_name, 
+                                           predictor, plot_tight = FALSE) {
+  
+  # Create y-axis label
+  y_label <- ifelse(predictor == "prevalence", "Prevalence", "Cases per 1000")
+  
+  # Define colors for model types
+  model_colors <- c("GRU" = "#E41A1C", "LSTM" = "#377EB8", "Actual" = "black")
+  
+  p <- ggplot(scenario_data, aes(x = years, y = .data[[predictor]], 
+                                 color = model_type)) +
+    geom_line(size = 1.2) +
+    scale_color_manual(values = model_colors, breaks = names(model_colors)) +
+    scale_x_continuous(
+      name = "Years",
+      breaks = 0:4,
+      labels = 0:4,
+      limits = c(0, 4),
+      expand = c(0.02, 0.02)
+    ) +
+    labs(
+      title = sprintf("%s - %s Prediction", scenario_name, y_label),
+      subtitle = "Years 2-6 of simulation (displayed as 0-4)",
+      y = y_label,
+      color = "Model"
+    ) +
+    theme_minimal() +
+    theme(
+      legend.position = "top",
+      panel.grid.minor = element_blank(),
+      panel.background = element_rect(fill = "white", color = NA),
+      plot.background = element_rect(fill = "white", color = NA),
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 10, color = "gray40"),
+      axis.title = element_text(size = 11),
+      legend.title = element_text(size = 10, face = "bold")
+    )
+  
+  # Add vertical line at year 1
+  if (1 >= 0 && 1 <= 4) {
+    p <- p + geom_vline(xintercept = 1, linetype = "dotted", 
+                       color = "gray50", alpha = 0.5)
+  }
+  
+  # Set y-axis limits
+  if (!plot_tight) {
+    if (predictor == "prevalence") {
+      p <- p + scale_y_continuous(limits = c(0, 1), labels = scales::percent_format())
+    } else {
+      y_max <- max(scenario_data[[predictor]], na.rm = TRUE) * 1.1
+      p <- p + scale_y_continuous(limits = c(0, y_max))
+    }
+  } else {
+    if (predictor == "prevalence") {
+      p <- p + scale_y_continuous(labels = scales::percent_format())
+    }
+  }
+  
+  return(p)
+}
+
+
+#' Quick plot function for interactive use
+#'
+#' @param csv_file Path to CSV file with emulator results
+#' @param output_dir Directory to save plots (optional)
+#' @param plot_type "individual", "combined", or "both" (default "both")
+#'
+#' @export
+plot_emulator_results <- function(csv_file, output_dir = NULL, plot_type = "both") {
+  
+  # Read CSV
+  results <- read.csv(csv_file, stringsAsFactors = FALSE)
+  
+  # Create plots
+  plots <- create_scenario_plots(
+    results = results,
+    output_dir = output_dir,
+    plot_type = plot_type
+  )
+  
+  # Return plots for further manipulation if needed
+  invisible(plots)
 }

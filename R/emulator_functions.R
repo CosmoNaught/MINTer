@@ -1,3 +1,126 @@
+#' Load Emulator Models with Caching
+#'
+#' @param models_base_dir Base directory (NULL for bundled)
+#' @param predictor "prevalence" or "cases"
+#' @param device "cpu" or "cuda" (NULL for auto)
+#' @param verbose Print loading messages
+#' @param force_reload Force reload even if cached
+#'
+#' @return List containing models and configuration
+#' @export
+load_emulator_models_cached <- function(models_base_dir = NULL, 
+                                       predictor = "prevalence",
+                                       device = NULL,
+                                       verbose = TRUE,
+                                       force_reload = FALSE) {
+  
+  # Check cache first unless force_reload
+  cache_key <- paste0("nn_", predictor)
+  if (!force_reload && !is.null(.minter_cache[[cache_key]])) {
+    if (verbose) message(sprintf("[INFO] Using cached %s models", predictor))
+    return(.minter_cache[[cache_key]])
+  }
+  
+  # Initialize Python if needed
+  initialize_python(verbose = FALSE)
+  
+  # Set device
+  if (is.null(device)) {
+    device <- if (torch$cuda$is_available()) "cuda" else "cpu"
+  }
+  if (verbose) message(sprintf("[INFO] Loading %s models on device: %s", predictor, device))
+  device_obj <- torch$device(device)
+  
+  # Find model directory
+  if (is.null(models_base_dir)) {
+    models_base_dir <- system.file("python/models", package = "MINTer")
+    if (models_base_dir == "") {
+      models_base_dir <- system.file("models", package = "MINTer")
+    }
+    if (models_base_dir == "" && file.exists("inst/models")) {
+      models_base_dir <- "inst/models"
+    } else if (models_base_dir == "" && file.exists("inst/python/models")) {
+      models_base_dir <- "inst/python/models"
+    }
+    
+    if (!dir.exists(models_base_dir)) {
+      stop("Models directory not found")
+    }
+  }
+  
+  predictor_models_dir <- file.path(models_base_dir, predictor)
+  
+  # Load configuration
+  args_path <- file.path(predictor_models_dir, "args.json")
+  if (!file.exists(args_path)) {
+    stop(sprintf("Could not find args.json in %s", predictor_models_dir))
+  }
+  
+  training_args <- jsonlite::fromJSON(args_path)
+  
+  # Load scaler
+  scaler_path <- file.path(predictor_models_dir, "static_scaler.pkl")
+  static_scaler <- pd$read_pickle(scaler_path)
+  
+  # Define static covariates
+  static_covars <- c("eir", "dn0_use", "dn0_future", "Q0", "phi_bednets",
+                    "seasonal", "routine", "itn_use", "irs_use", 
+                    "itn_future", "irs_future", "lsm")
+  
+  # Model configuration
+  use_cyclical_time <- training_args$use_cyclical_time %||% TRUE
+  input_size <- ifelse(use_cyclical_time, 2 + length(static_covars), 1 + length(static_covars))
+  hidden_size <- training_args$hidden_size %||% 256
+  num_layers <- training_args$num_layers %||% 4
+  dropout <- training_args$dropout %||% 0.05
+  
+  # Load models using optimized Python loading
+  gru_path <- file.path(predictor_models_dir, "gru_best.pt")
+  lstm_path <- file.path(predictor_models_dir, "lstm_best.pt")
+  
+  # Load both models in one Python call to minimize overhead
+  reticulate::py_run_string(sprintf("
+import warnings
+warnings.filterwarnings('ignore')
+
+# Load and prepare models in one go
+gru_model, gru_hidden, gru_layers = load_model_from_checkpoint(
+    '%s', %d, %d, 1, %f, %d, 'gru', '%s'
+)
+lstm_model, lstm_hidden, lstm_layers = load_model_from_checkpoint(
+    '%s', %d, %d, 1, %f, %d, 'lstm', '%s'
+)
+
+# Move to device and set to eval mode
+gru_model = gru_model.to(torch.float32).to(torch.device('%s')).eval()
+lstm_model = lstm_model.to(torch.float32).to(torch.device('%s')).eval()
+", gru_path, input_size, hidden_size, dropout, num_layers, predictor,
+   lstm_path, input_size, hidden_size, dropout, num_layers, predictor,
+   device, device))
+  
+  # Create model object
+  models <- list(
+    gru_model = reticulate::py$gru_model,
+    lstm_model = reticulate::py$lstm_model,
+    static_scaler = static_scaler,
+    static_covars = static_covars,
+    use_cyclical_time = use_cyclical_time,
+    predictor = predictor,
+    device = device_obj,
+    training_args = training_args,
+    models_dir = predictor_models_dir
+  )
+  
+  # Cache the models
+  .minter_cache[[cache_key]] <- models
+  
+  if (verbose) {
+    message(sprintf("[INFO] %s models loaded and cached", predictor))
+  }
+  
+  return(models)
+}
+
 #' Load Emulator Models
 #'
 #' @param models_base_dir Base directory containing model files. If NULL (default),

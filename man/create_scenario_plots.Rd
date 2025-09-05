@@ -4,12 +4,25 @@
 \alias{create_scenario_plots}
 \title{Create Scenario Plots from Emulator Results}
 \usage{
-create_scenario_plots(results, output_dir = NULL, plot_tight = FALSE)
+create_scenario_plots(
+  results,
+  output_dir = NULL,
+  plot_type = "both",
+  predictor = NULL,
+  window_size = 14,
+  plot_tight = FALSE
+)
 }
 \arguments{
-\item{results}{Data frame from run_malaria_emulator}
+\item{results}{Data frame with columns: index, timestep, prevalence/cases, model_type, scenario}
 
 \item{output_dir}{Directory to save plots (optional)}
+
+\item{plot_type}{"individual", "combined", or "both" (default "both")}
+
+\item{predictor}{"prevalence" or "cases" (auto-detected if NULL)}
+
+\item{window_size}{Days per timestep (default 14)}
 
 \item{plot_tight}{Use tight y-axis scaling (default FALSE)}
 }
@@ -17,5 +30,6 @@ create_scenario_plots(results, output_dir = NULL, plot_tight = FALSE)
 List of ggplot objects
 }
 \description{
-Creates plots for each scenario from emulator results dataframe.
+Creates plots for scenarios from emulator results dataframe.
+Can create either individual plots per scenario or combined plot.
 }
