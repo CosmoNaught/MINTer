@@ -24,7 +24,7 @@
 #'
 #' @return List containing prevalence and cases predictions as returned by run_minter_scenarios
 #' @export
-mintweb_controller <- function(
+run_mintweb_controller <- function(
   res_use,
   res_future = NULL,
   py_only,
@@ -82,7 +82,7 @@ mintweb_controller <- function(
       results$prevalence <- results$prevalence[results$prevalence$timestep >= 52, ] # Remove first 2 years from sim
       
       # Remove index and timestep columns
-      columns_to_remove <- c("index", "timestep")
+      columns_to_remove <- c("index", "timestep", "model_type")
       cols_to_keep <- !names(results$prevalence) %in% columns_to_remove
       results$prevalence <- results$prevalence[, cols_to_keep, drop = FALSE]
     }

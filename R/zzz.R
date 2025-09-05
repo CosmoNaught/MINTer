@@ -25,15 +25,9 @@ sklearn <- NULL
          envir = parent.env(environment()))
   
   # Pre-load all models in background (non-blocking)
-  # This happens after package load to not slow down initial loading
-  later::later(function() {
-    tryCatch({
-      cat("\n")
-      preload_all_models(verbose = TRUE)
-    }, error = function(e) {
-      # Silent fail - models will be loaded on first use
-    })
-  }, delay = 0.1)
+
+  preload_all_models(verbose = TRUE)
+
 }
 
 #' Preload All Models
