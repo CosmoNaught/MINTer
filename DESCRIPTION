@@ -38,6 +38,6 @@ Suggests:
     rmarkdown
 Remotes:
     mrc-ide/malariasimulation,
-    CosmoNaught/estiMINT
+    CosmoNaught/estiMINT@overnaul-package-123
 Config/testthat/edition: 3
 VignetteBuilder: knitr

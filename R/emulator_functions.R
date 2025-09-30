@@ -1,3 +1,5 @@
+# emulator_functions.R
+
 #' Load Emulator Models with Caching
 #'
 #' @param models_base_dir Base directory (NULL for bundled)

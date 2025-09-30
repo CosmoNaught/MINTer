@@ -46,6 +46,7 @@ run_minter_scenarios <- function(
   lsm,
   eir_models = "xgboost",
   prevalence_models = "LSTM",
+  cases_models = "LSTM",
   predictor = c("prevalence", "cases"),
   year_start = 2,
   year_end = 5,
@@ -152,27 +153,13 @@ run_minter_scenarios <- function(
   if (use_cache) {
     pretrained <- get_cached_model("eir_models")
   } else {
-    pretrained <- estiMINT::load_pretrained_eir_models()
+    pretrained <- estiMINT::load_xgb_model()
   }
   
   if (benchmark) {
     bench_times$load_eir_models <- as.numeric(difftime(Sys.time(), t_start, units = "secs"))
   }
-  
-  if ("cases" %in% predictor) {
-    if (benchmark) t_start <- Sys.time()
     
-    if (use_cache) {
-      pretrained_cases <- get_cached_model("case_models")
-    } else {
-      pretrained_cases <- estiMINT::load_pretrained_case_models()
-    }
-    
-    if (benchmark) {
-      bench_times$load_cases_models <- as.numeric(difftime(Sys.time(), t_start, units = "secs"))
-    }
-  }
-  
   # ---- Build all scenarios first (vectorized) ----
   if (benchmark) t_start <- Sys.time()
   
@@ -228,21 +215,13 @@ run_minter_scenarios <- function(
       Q0          = Q0[i],
       phi_bednets = phi[i],
       seasonal    = season[i],
-      routine     = routine[i],
       itn_use     = net_now$itn_use,
       irs_use     = irs[i]
     )
     
     eir_predictions <- list()
     if ("xgboost" %in% eir_models) {
-      eir_predictions$xgboost <- estiMINT::predict_initial_eir(
-        pretrained$xgboost, runtime, pretrained$feature_cols
-      )
-    }
-    if ("rf" %in% eir_models) {
-      eir_predictions$rf <- estiMINT::predict_initial_eir(
-        pretrained$rf_model, runtime, pretrained$feature_cols
-      )
+      eir_predictions$xgboost <- estiMINT::run_xgb_model(runtime, pretrained)
     }
     
     eir <- Reduce(`+`, eir_predictions) / length(eir_predictions)
@@ -321,42 +300,25 @@ run_minter_scenarios <- function(
   if ("cases" %in% predictor) {
     if (benchmark) t_start <- Sys.time()
     
-    years <- year_start:year_end
-    new_data_cases <- tidyr::crossing(scenarios_df, year = years)
-    
-    xgb_model <- if (is.list(pretrained_cases$xgboost_cases) && 
-                    "model" %in% names(pretrained_cases$xgboost_cases)) {
-      pretrained_cases$xgboost_cases$model
-    } else {
-      pretrained_cases$xgboost_cases
-    }
-    
-    xgb_predictions <- estiMINT::predict_annual_cases(
-      xgb_model, new_data_cases, pretrained_cases$feature_cols
+    # Run batched predictions
+    cases_results <- run_malaria_emulator(
+      scenarios = scenarios_df,
+      predictor = "cases",
+      model_types = cases_models,
+      use_cache = use_cache,
+      benchmark = benchmark
     )
     
-    rf_model <- if (is.list(pretrained_cases$rf_cases) && 
-                   "model" %in% names(pretrained_cases$rf_cases)) {
-      pretrained_cases$rf_cases$model
-    } else {
-      pretrained_cases$rf_cases
-    }
-    
-    rf_predictions <- estiMINT::predict_annual_cases(
-      rf_model, new_data_cases, pretrained_cases$feature_cols
-    )
-    
-    new_data_cases$cases_per_1000 <- (xgb_predictions + rf_predictions) / 2
-    new_data_cases$scenario <- rep(scenario_ids, each = length(years))
-    
-    results$cases <- new_data_cases |>
-      dplyr::group_by(scenario) |>
-      dplyr::mutate(index = dplyr::cur_group_id()) |>
-      dplyr::ungroup() |>
-      dplyr::select("year", "cases_per_1000", "scenario")
+    # Add scenario IDs
+    cases_results$scenario <- rep(scenario_ids, 
+                                      each = nrow(cases_results) / n_scenarios)
+    results$cases <- cases_results
     
     if (benchmark) {
-      bench_times$run_cases_models <- as.numeric(difftime(Sys.time(), t_start, units = "secs"))
+      bench_times$run_neural_network <- as.numeric(difftime(Sys.time(), t_start, units = "secs"))
+      if (!is.null(attr(cases_results, "benchmark"))) {
+        bench_times$nn_details <- attr(cases_results, "benchmark")
+      }
     }
   }
   
@@ -374,12 +336,6 @@ run_minter_scenarios <- function(
     cat(sprintf("Load EIR models: %.3f seconds%s\n", 
                bench_times$load_eir_models,
                ifelse(use_cache && bench_times$load_eir_models < 0.01, " (cached)", "")))
-    
-    if ("cases" %in% predictor) {
-      cat(sprintf("Load Cases models: %.3f seconds%s\n", 
-                 bench_times$load_cases_models,
-                 ifelse(use_cache && bench_times$load_cases_models < 0.01, " (cached)", "")))
-    }
     
     cat(sprintf("Run EIR predictions (%d scenarios): %.3f seconds\n", 
                n_scenarios, bench_times$run_eir_models))
@@ -424,8 +380,42 @@ run_minter_scenarios <- function(
     }
     
     if ("cases" %in% predictor) {
-      cat(sprintf("Run Cases predictions (%d scenarios): %.3f seconds\n", 
-                 n_scenarios, bench_times$run_cases_models))
+      cat(sprintf("Run Neural Network (%d scenarios): %.3f seconds\n", 
+                 n_scenarios, bench_times$run_neural_network))
+      
+      if (!is.null(bench_times$nn_details)) {
+        cat("\n--- Neural Network Performance ---\n")
+        if (!is.null(bench_times$nn_details$model_loading)) {
+          cat(sprintf("  Model loading: %.3f seconds%s\n", 
+                     bench_times$nn_details$model_loading,
+                     ifelse(use_cache && bench_times$nn_details$model_loading < 0.01, 
+                           " (cached)", "")))
+        }
+        if (!is.null(bench_times$nn_details$data_prep)) {
+          cat(sprintf("  Data preparation: %.3f seconds\n", 
+                     bench_times$nn_details$data_prep))
+        }
+        if (!is.null(bench_times$nn_details$python_inference)) {
+          cat(sprintf("  Python inference: %.3f seconds\n", 
+                     bench_times$nn_details$python_inference))
+          cat(sprintf("    - Target (10ms x %d): %.3f seconds\n", 
+                     n_scenarios, 0.010 * n_scenarios))
+          
+          overhead <- bench_times$nn_details$python_inference - (0.010 * n_scenarios)
+          if (overhead > 0) {
+            cat(sprintf("    - Overhead: %.3f seconds (%.1fx slower)\n",
+                       overhead,
+                       bench_times$nn_details$python_inference / (0.010 * n_scenarios)))
+          } else {
+            cat(sprintf("    - ACHIEVED TARGET! %.1fx faster than expected\n",
+                       (0.010 * n_scenarios) / bench_times$nn_details$python_inference))
+          }
+        }
+        if (!is.null(bench_times$nn_details$r_conversion)) {
+          cat(sprintf("  R data conversion: %.3f seconds\n", 
+                     bench_times$nn_details$r_conversion))
+        }
+      }
     }
     
     cat(sprintf("\nTotal time: %.3f seconds\n", bench_times$total))

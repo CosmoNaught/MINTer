@@ -1,3 +1,5 @@
+# emulator_main.R
+
 #' Optimized Run Malaria Emulator with Batching
 #'
 #' @param db_path Path to DuckDB database (for database mode)
