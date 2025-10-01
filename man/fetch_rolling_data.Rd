@@ -2,7 +2,7 @@
 % Please edit documentation in R/database_functions.R
 \name{fetch_rolling_data}
 \alias{fetch_rolling_data}
-\title{Fetch Rolling Data from DuckDB}
+\title{Fetch windowed (non-overlapping) data from DuckDB (1:1 with Python)}
 \usage{
 fetch_rolling_data(
   db_path,
@@ -15,17 +15,25 @@ fetch_rolling_data(
 \arguments{
 \item{db_path}{Path to DuckDB database}
 
-\item{table_name}{Name of table in database}
+\item{table_name}{Name of table in database (default "simulation_results")}
 
-\item{window_size}{Window size for rolling average (days)}
+\item{window_size}{Window size (days) for binning (default 14)}
 
-\item{param_index}{Parameter index to fetch (NULL for list of available)}
+\item{param_index}{Parameter index to fetch (NULL returns list of available)}
 
 \item{predictor}{"prevalence" or "cases"}
 }
 \value{
-Data frame with results or list of available parameters
+Data frame with columns:
+parameter_index, simulation_index, global_index (numeric if parsable),
+timesteps (1..T window index), abs_timesteps (start day of bin),
+prevalence/cases, and static covariates.
 }
 \description{
-Fetch Rolling Data from DuckDB
+Bins the last 6 years of each simulation into non-overlapping windows
+of size \code{window_size} days, anchored at day \code{6*365} of the simulation.
+For prevalence, it computes ratio-of-sums within each bin:
+SUM(n_detect_lm_0_1825) / SUM(n_age_0_1825)
+For cases, it computes:
+1000 * SUM(n_inc_clinical_0_36500) / NULLIF(SUM(n_age_0_36500), 0)
 }

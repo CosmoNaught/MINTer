@@ -2,34 +2,37 @@
 % Please edit documentation in R/emulator_main.R
 \name{generate_scenario_predictions_batched}
 \alias{generate_scenario_predictions_batched}
-\title{Generate Scenario Predictions with Batching}
+\title{Generate Scenario Predictions with Batching (passes precision flag)}
 \usage{
 generate_scenario_predictions_batched(
   scenarios,
   models,
-  model_types = c("GRU", "LSTM"),
+  model_types = c("LSTM"),
   time_steps = 2190,
   window_size = 14,
-  benchmark = FALSE
+  benchmark = FALSE,
+  use_amp = FALSE
 )
 }
 \arguments{
 \item{scenarios}{Data frame with scenario parameters}
 
-\item{models}{List from load_emulator_models()}
+\item{models}{List from load_emulator_models_cached()}
 
-\item{model_types}{Vector of model types}
+\item{model_types}{Vector of model types (currently "LSTM")}
 
-\item{time_steps}{Number of time steps}
+\item{time_steps}{Number of time steps (days)}
 
-\item{window_size}{Window size for rolling average}
+\item{window_size}{Window size for rolling average (days)}
 
 \item{benchmark}{Track timing details}
+
+\item{use_amp}{Logical; TRUE to use CUDA autocast (fp16) like AMP; FALSE (default) for fp32}
 }
 \value{
 List with predictions for each scenario
 }
 \description{
-Generate Scenario Predictions with Batching
+Generate Scenario Predictions with Batching (passes precision flag)
 }
 \keyword{internal}

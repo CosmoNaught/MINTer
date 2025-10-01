@@ -2,7 +2,7 @@
 % Please edit documentation in R/emulator_main.R
 \name{run_emulator_db}
 \alias{run_emulator_db}
-\title{Run Emulator Database Mode (Internal)}
+\title{Run Emulator Database Mode (Internal, 1:1 precision + features)}
 \usage{
 run_emulator_db(
   db_path,
@@ -10,7 +10,8 @@ run_emulator_db(
   models,
   window_size = 14,
   counterfactual = NULL,
-  model_types = c("GRU", "LSTM")
+  model_types = c("LSTM"),
+  use_amp = FALSE
 )
 }
 \arguments{
@@ -18,18 +19,20 @@ run_emulator_db(
 
 \item{param_index}{Parameter index to analyze}
 
-\item{models}{List from load_emulator_models()}
+\item{models}{List from load_emulator_models_cached()}
 
-\item{window_size}{Window size for rolling average}
+\item{window_size}{Window size for rolling average (days)}
 
-\item{counterfactual}{Named list with parameter name and values (optional)}
+\item{counterfactual}{Named list with parameter name and values (optional; first simulation only)}
 
-\item{model_types}{Vector of model types to use}
+\item{model_types}{Vector of model types to use (currently "LSTM")}
+
+\item{use_amp}{Logical; TRUE to use CUDA autocast; FALSE (default) for fp32 to match Python visualizer}
 }
 \value{
 List with predictions and metadata
 }
 \description{
-Run Emulator Database Mode (Internal)
+Run Emulator Database Mode (Internal, 1:1 precision + features)
 }
 \keyword{internal}

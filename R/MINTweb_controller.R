@@ -78,10 +78,6 @@ run_mintweb_controller <- function(
   if (clean_output) {
     # Process prevalence data
     if (!is.null(results$prevalence)) {
-      # Filter to only include timestep 52 onwards
-      results$prevalence <- results$prevalence[results$prevalence$timestep >= 52, ] # Remove first 2 years from sim
-      
-      # Remove index and timestep columns
       columns_to_remove <- c("index", "timestep", "model_type")
       cols_to_keep <- !names(results$prevalence) %in% columns_to_remove
       results$prevalence <- results$prevalence[, cols_to_keep, drop = FALSE]
@@ -89,8 +85,7 @@ run_mintweb_controller <- function(
     
     # Process cases data
     if (!is.null(results$cases)) {
-      # Remove year column
-      columns_to_remove <- c("year")
+      columns_to_remove <- c("index", "timestep","model_type")
       cols_to_keep <- !names(results$cases) %in% columns_to_remove
       results$cases <- results$cases[, cols_to_keep, drop = FALSE]
     }

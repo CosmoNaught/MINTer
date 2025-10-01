@@ -2,18 +2,10 @@
 % Please edit documentation in R/database_functions.R
 \name{list_available_parameters}
 \alias{list_available_parameters}
-\title{List Available Parameters in Database}
+\title{List Available Parameters in Database (with parsed global_index)}
 \usage{
 list_available_parameters(db_path, table_name = "simulation_results")
 }
-\arguments{
-\item{db_path}{Path to DuckDB database}
-
-\item{table_name}{Name of table in database}
-}
-\value{
-Data frame with parameter_index and global_index
-}
 \description{
-List Available Parameters in Database
+List Available Parameters in Database (with parsed global_index)
 }

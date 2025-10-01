@@ -23,6 +23,7 @@ run_minter_scenarios(
   lsm,
   eir_models = "xgboost",
   prevalence_models = "LSTM",
+  cases_models = "LSTM",
   predictor = c("prevalence", "cases"),
   year_start = 2,
   year_end = 5,

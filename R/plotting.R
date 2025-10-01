@@ -162,7 +162,6 @@ create_combined_scenario_plot <- function(plot_data, predictor, plot_tight = FAL
       legend.text = element_text(size = 9)
     )
   
-  # Add vertical line at year 1 (year 3 in original timeline) if it exists
   if (1 >= 0 && 1 <= 4) {
     p <- p + geom_vline(xintercept = 1, linetype = "dotted", 
                        color = "gray50", alpha = 0.5)
