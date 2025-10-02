@@ -3,7 +3,7 @@
 #' Optimized Run Malaria Emulator with Batching (1:1 with Python defaults)
 #'
 #' Runs the emulator either in database mode (DuckDB-backed) or scenario mode (data.frame),
-#' using the schema-aware LSTM with options to align precision and simulation aggregation
+#' using the schema-aware LSTM with options to align precision and simulation aggregation.
 #'
 #' @param db_path Path to DuckDB database (for database mode)
 #' @param param_index Parameter index for database mode (NULL for random)
@@ -18,7 +18,10 @@
 #' @param use_cache Use cached models (default TRUE)
 #' @param benchmark Track detailed timing (default FALSE)
 #' @param precision Precision control: "fp32" (default, matches Python visualizer) or "amp" (CUDA autocast)
-#' @param sim_agg Simulation aggregation in DB mode: "mean" (default, matches Python), "first", or "median"
+#' @param sim_agg Simulation aggregation in DB mode: "mean" (default), "first", or "median"
+#' @param estimint_prev If TRUE in DB mode, compute estiMINT EIR using the Actual mean prevalence
+#'   between displayed years 0–1 (days 730–1095) and add a "LSTM+estiMINT" line.
+#'   Works for predictor="prevalence" and predictor="cases" (the latter fetches prevalence from DB).
 #'
 #' @return Data frame with columns: index, timestep, {predictor}, model_type
 #' @export
@@ -35,7 +38,8 @@ run_malaria_emulator <- function(db_path = NULL,
                                 use_cache = TRUE,
                                 benchmark = FALSE,
                                 precision = c("fp32","amp"),
-                                sim_agg = c("mean","first","median")) {
+                                sim_agg = c("mean","first","median"),
+                                estimint_prev = FALSE) {
 
   # Initialize benchmark tracking
   if (benchmark) {
@@ -55,7 +59,7 @@ run_malaria_emulator <- function(db_path = NULL,
     stop("Predictor must be either 'prevalence' or 'cases'")
   }
 
-  valid_models <- c("LSTM")  # Only LSTM now with schema-aware architecture
+  valid_models <- c("LSTM")
   if (!all(model_types %in% valid_models)) {
     stop(sprintf("Invalid model types. Must be: %s", paste(valid_models, collapse = ", ")))
   }
@@ -111,20 +115,23 @@ run_malaria_emulator <- function(db_path = NULL,
       window_size    = window_size,
       counterfactual = counterfactual,
       model_types    = model_types,
-      use_amp        = use_amp
+      use_amp        = use_amp,
+      estimint_prev  = estimint_prev
     )
 
-    results <- convert_db_results_to_dataframe(raw_results, predictor, model_types, sim_agg = sim_agg)
+    results <- convert_db_results_to_dataframe(raw_results, predictor, model_types,
+                                               sim_agg = sim_agg,
+                                               include_estimint = estimint_prev)
 
     # Add metadata
-    attr(results, "predictor")     <- predictor
-    attr(results, "model_types")   <- model_types
-    attr(results, "window_size")   <- window_size
-    attr(results, "mode")          <- "database"
-    attr(results, "param_index")   <- raw_results$param_index
-    attr(results, "global_index")  <- raw_results$global_index
-    attr(results, "parameters")    <- raw_results$parameters
-    attr(results, "counterfactual")<- counterfactual
+    attr(results, "predictor")      <- predictor
+    attr(results, "model_types")    <- model_types
+    attr(results, "window_size")    <- window_size
+    attr(results, "mode")           <- "database"
+    attr(results, "param_index")    <- raw_results$param_index
+    attr(results, "global_index")   <- raw_results$global_index
+    attr(results, "parameters")     <- raw_results$parameters
+    attr(results, "counterfactual") <- counterfactual
 
     message("\n[INFO] Summary:")
     message(sprintf("  - Mode: Database"))
@@ -148,6 +155,10 @@ run_malaria_emulator <- function(db_path = NULL,
     # SCENARIO MODE (BATCHED)
     # -----------------------
     message("[INFO] Running in scenario mode (optimized)")
+
+    if (estimint_prev) {
+      warning("'estimint_prev' requires DB mode (needs Actual prevalence). Ignoring in scenario mode.")
+    }
 
     if (!is.data.frame(scenarios)) stop("Scenarios must be a data frame")
     if (nrow(scenarios) == 0) stop("Scenarios data frame is empty")
@@ -269,7 +280,8 @@ generate_scenario_predictions_batched <- function(scenarios, models,
   # Process each scenario
   for (i in 1:n_scenarios) {
     # Create time series
-    abs_t <- seq(from = 0, length.out = n_timesteps) * window_size
+    last_6_years_day <- 6 * 365
+    abs_t <- last_6_years_day + seq(from = 0, length.out = n_timesteps) * window_size
     rel_t <- 1:n_timesteps
 
     # Build dataframe for this scenario
@@ -341,17 +353,20 @@ generate_scenario_predictions_batched <- function(scenarios, models,
 #' @param counterfactual Named list with parameter name and values (optional; first simulation only)
 #' @param model_types Vector of model types to use (currently "LSTM")
 #' @param use_amp Logical; TRUE to use CUDA autocast; FALSE (default) for fp32 to match Python visualizer
+#' @param estimint_prev If TRUE, add LSTM+estiMINT by estimating EIR from Actual prevalence (years 0–1).
+#'   For predictor="cases", prevalence is fetched from DB for the same param_index.
 #'
 #' @return List with predictions and metadata
 #' @keywords internal
 run_emulator_db <- function(db_path, param_index, models, window_size = 14,
                            counterfactual = NULL, model_types = c("LSTM"),
-                           use_amp = FALSE) {
+                           use_amp = FALSE,
+                           estimint_prev = FALSE) {
 
   # Validate model types
   model_types <- match.arg(model_types, c("LSTM"), several.ok = TRUE)
 
-  # Fetch data
+  # Fetch main frame for the chosen predictor
   message(sprintf("[INFO] Connecting to DuckDB at %s", db_path))
   df <- fetch_rolling_data(db_path, "simulation_results", window_size,
                            param_index, models$predictor)
@@ -382,40 +397,129 @@ run_emulator_db <- function(db_path, param_index, models, window_size = 14,
     message(sprintf("  - %s: %g", param_name, param_values[[param_name]]))
   }
 
-  # Import numpy
+  # If we need estiMINT and we're predicting CASES, prefetch prevalence series for the same param
+  prev_groups <- NULL
+  if (estimint_prev) {
+    if (models$predictor == "cases") {
+      df_prev <- tryCatch(
+        fetch_rolling_data(db_path, "simulation_results", window_size, param_index, "prevalence"),
+        error = function(e) NULL
+      )
+      if (!is.null(df_prev) && nrow(df_prev) > 0) {
+        prev_groups <- split(df_prev[, c("simulation_index","timesteps","prevalence")], df_prev$simulation_index)
+      } else {
+        message("[WARN] Could not fetch prevalence series for estiMINT with predictor='cases'. Will fall back to any 'prevalence' present in the cases frame, else to 0.1.")
+      }
+    }
+  }
+
+  # Optional: load estiMINT once
+  pretrained_eir <- NULL
+  if (estimint_prev) {
+    pretrained_eir <- estiMINT::load_xgb_model()
+  }
+
+  # Helpers
   np <- reticulate::import("numpy")
+  get_param_val <- function(df1row, candidates) {
+    for (nm in candidates) if (nm %in% names(df1row)) return(as.numeric(df1row[[nm]]))
+    return(NA_real_)
+  }
 
   # Prepare results
   target_column <- ifelse(models$predictor == "prevalence", "prevalence", "cases")
   all_predictions <- list()
   cf_predictions <- list()
 
+  # Window indices for years 0–1 in the displayed range
+  start_i <- ceiling(730 / window_size)
+  end_i   <- floor(1095 / window_size)
+
   # Process each simulation
   for (sim_idx in names(sim_groups)) {
     sim_df <- sim_groups[[sim_idx]]
     sim_df <- sim_df[order(sim_df$timesteps), ]
 
-    # CRITICAL: Ensure abs_timesteps column exists
+    # Ensure abs_timesteps column exists
     if (!"abs_timesteps" %in% names(sim_df)) {
       last_6_years_day <- 6 * 365
       sim_df$abs_timesteps <- last_6_years_day + (sim_df$timesteps - 1) * window_size
     }
 
-    # Get target values
+    # Targets
     y_true <- as.numeric(sim_df[[target_column]])
     if (nrow(sim_df) == 0) {
       warning(sprintf("Skipping simulation %s: no data after processing", sim_idx))
       next
     }
 
-    # Prepare features (schema-aware)
+    # Standard features + LSTM
     X_full <- prepare_input_features_schema(sim_df, models, window_size)
     X_full_np <- np$array(X_full, dtype = np$float32)
 
-    # Predictions (precision controlled)
     y_lstm <- reticulate::py$predict_full_sequence(
       models$lstm_model, X_full_np, models$device, models$predictor, use_amp = use_amp
     )
+
+    # ---------- estiMINT branch ----------
+    y_lstm_esti <- NULL
+    if (!is.null(pretrained_eir)) {
+      # Find a prevalence series for this simulation
+      if ("prevalence" %in% names(sim_df)) {
+        prev_series <- sim_df$prevalence
+        prev_t      <- sim_df$timesteps
+      } else if (!is.null(prev_groups) && !is.null(prev_groups[[sim_idx]])) {
+        prev_series <- prev_groups[[sim_idx]]$prevalence
+        prev_t      <- prev_groups[[sim_idx]]$timesteps
+      } else {
+        prev_series <- NA_real_
+        prev_t      <- NA_integer_
+      }
+
+      # Compute baseline prevalence (years 0–1)
+      if (all(is.na(prev_series))) {
+        base_prev <- NA_real_
+      } else {
+        in_win <- which(prev_t >= start_i & prev_t <= end_i)
+        base_prev <- mean(prev_series[in_win], na.rm = TRUE)
+        if (!is.finite(base_prev)) base_prev <- mean(prev_series, na.rm = TRUE)
+      }
+      if (!is.finite(base_prev)) {
+        base_prev <- 0.1
+        message(sprintf("[WARN] Prevalence window mean unavailable for sim %s; using fallback 0.1", sim_idx))
+      }
+
+      # Build runtime covariates from the first row
+      srow <- sim_df[1, , drop=FALSE]
+      runtime <- data.frame(
+        prevalence  = base_prev,
+        dn0_use     = get_param_val(srow, c("dn0_use","dn0")),
+        Q0          = get_param_val(srow, c("Q0")),
+        phi_bednets = get_param_val(srow, c("phi_bednets","phi")),
+        seasonal    = get_param_val(srow, c("seasonal","season")),
+        itn_use     = get_param_val(srow, c("itn_use")),
+        irs_use     = get_param_val(srow, c("irs_use","irs"))
+      )
+
+      # Estimate EIR and override
+      eir_hat <- as.numeric(estiMINT::run_xgb_model(runtime, pretrained_eir))
+
+      sim_df_est <- sim_df
+      if (!("eir" %in% names(sim_df_est))) {
+        sim_df_est$eir <- eir_hat
+      } else {
+        sim_df_est$eir[] <- eir_hat
+      }
+
+      # Recompute features and predictions with overridden EIR (for current predictor)
+      X_est <- prepare_input_features_schema(sim_df_est, models, window_size)
+      X_est_np <- np$array(X_est, dtype = np$float32)
+
+      y_lstm_esti <- reticulate::py$predict_full_sequence(
+        models$lstm_model, X_est_np, models$device, models$predictor, use_amp = use_amp
+      )
+    }
+    # ---------- end estiMINT branch ----------
 
     # Store per-timestep predictions
     for (i in 1:length(y_true)) {
@@ -427,10 +531,13 @@ run_emulator_db <- function(db_path, param_index, models, window_size = 14,
         true_value = y_true[i],
         lstm_prediction = y_lstm[i]
       )
+      if (!is.null(y_lstm_esti)) {
+        pred_item$lstm_estimint_prediction <- y_lstm_esti[i]
+      }
       all_predictions[[length(all_predictions) + 1]] <- pred_item
     }
 
-    # Counterfactual (first simulation only)
+    # Counterfactual (first simulation only) — unchanged
     if (!is.null(counterfactual) && sim_idx == names(sim_groups)[1]) {
       cf_param_name <- names(counterfactual)[1]
       cf_values <- counterfactual[[1]]
@@ -483,10 +590,13 @@ run_emulator_db <- function(db_path, param_index, models, window_size = 14,
 #' @param predictor "prevalence" or "cases"
 #' @param model_types Vector of model types used
 #' @param sim_agg One of "mean" (default), "first", "median"
+#' @param include_estimint If TRUE, include aggregated "LSTM+estiMINT" if available
 #'
 #' @return Data frame with standardized format
 #' @keywords internal
-convert_db_results_to_dataframe <- function(raw_results, predictor, model_types, sim_agg = c("mean","first","median")) {
+convert_db_results_to_dataframe <- function(raw_results, predictor, model_types,
+                                            sim_agg = c("mean","first","median"),
+                                            include_estimint = FALSE) {
   sim_agg <- match.arg(sim_agg)
 
   # Flatten
@@ -496,7 +606,7 @@ convert_db_results_to_dataframe <- function(raw_results, predictor, model_types,
     stop("Unexpected structure in raw_results$predictions.")
   }
 
-  # If "first": restrict to the minimum simulation_index (legacy behavior)
+  # Choose aggregation scope
   if (sim_agg == "first") {
     min_sim <- min(pred_df$simulation_index, na.rm = TRUE)
     pred_df_use <- pred_df[pred_df$simulation_index == min_sim, , drop = FALSE]
@@ -511,7 +621,7 @@ convert_db_results_to_dataframe <- function(raw_results, predictor, model_types,
 
   results_list <- list()
 
-  # Actual (aggregate across simulations per timestep)
+  # Actual
   actual_df <- pred_df_use |>
     dplyr::group_by(timestep) |>
     dplyr::summarise(value = agg_fun(true_value), .groups = "drop") |>
@@ -519,7 +629,7 @@ convert_db_results_to_dataframe <- function(raw_results, predictor, model_types,
     dplyr::select(index, timestep, value, model_type)
   results_list[[length(results_list)+1]] <- actual_df
 
-  # LSTM (aggregate across simulations per timestep)
+  # LSTM
   if ("LSTM" %in% model_types && "lstm_prediction" %in% names(pred_df_use)) {
     lstm_df <- pred_df_use |>
       dplyr::group_by(timestep) |>
@@ -529,18 +639,15 @@ convert_db_results_to_dataframe <- function(raw_results, predictor, model_types,
     results_list[[length(results_list)+1]] <- lstm_df
   }
 
-  # GRU kept for completeness (not used in current schema-aware path)
-  if ("GRU" %in% model_types && "gru_prediction" %in% names(pred_df_use)) {
-    gru_df <- pred_df_use |>
+  # LSTM+estiMINT (optional)
+  if (include_estimint && "lstm_estimint_prediction" %in% names(pred_df_use)) {
+    lstm_esti_df <- pred_df_use |>
       dplyr::group_by(timestep) |>
-      dplyr::summarise(value = agg_fun(gru_prediction), .groups = "drop") |>
-      dplyr::mutate(index = 1L, model_type = "GRU") |>
+      dplyr::summarise(value = agg_fun(lstm_estimint_prediction), .groups = "drop") |>
+      dplyr::mutate(index = 1L, model_type = "LSTM+estiMINT") |>
       dplyr::select(index, timestep, value, model_type)
-    results_list[[length(results_list)+1]] <- gru_df
+    results_list[[length(results_list)+1]] <- lstm_esti_df
   }
-
-  # Counterfactuals are returned as-is (if present). If you want them aggregated too,
-  # mirror the same group_by/summarise by (counterfactual_param, counterfactual_value, timestep).
 
   results <- dplyr::bind_rows(results_list)
   names(results)[names(results) == "value"] <- predictor
