@@ -1,13 +1,16 @@
 #' Optimized Run MINT Scenarios for Malaria Intervention Analysis
 #'
+#' Runs vectorized scenario builds, predicts EIR, and batches neural-network
+#' inference for prevalence and/or cases.
+#'
 #' @param res_use Numeric vector of current resistance levels
 #' @param res_future Numeric vector of future resistance levels after next campaign
 #' @param py_only Numeric vector of pyrethroid-only net proportions
-#' @param py_pbo Numeric vector of pyrethroid-PBO net proportions  
+#' @param py_pbo Numeric vector of pyrethroid-PBO net proportions
 #' @param py_pyrrole Numeric vector of pyrethroid-pyrrole net proportions
 #' @param py_ppf Numeric vector of pyrethroid-PPF net proportions
 #' @param net_type_future Character vector of future net choices per scenario
-#' @param itn_future Numeric vector (0 - 1) of future ITN coverage per scenario
+#' @param itn_future Numeric vector (0–1) of future ITN coverage per scenario
 #' @param prev Numeric vector of malaria prevalence levels
 #' @param Q0 Numeric vector of Q0 values
 #' @param phi Numeric vector of phi bednet values
@@ -16,14 +19,15 @@
 #' @param irs Numeric vector of current IRS coverage
 #' @param irs_future Numeric vector of future IRS coverage
 #' @param lsm Numeric vector of LSM coverage
-#' @param eir_models Character vector of models to use for EIR prediction
-#' @param prevalence_models Character vector of models for prevalence prediction
-#' @param predictor Character vector of predictors to run
+#' @param eir_models Character vector of models to use for EIR prediction (e.g., \code{"xgboost"})
+#' @param prevalence_models Character vector of models for prevalence prediction (e.g., \code{"LSTM"})
+#' @param cases_models Character vector of models for cases prediction (e.g., \code{"LSTM"})
+#' @param predictor Character vector of predictors to run; one or both of \code{c("prevalence","cases")}
 #' @param year_start,year_end Integers for case-year range
 #' @param scenario_tag Optional character vector of scenario identifiers
-#' @param benchmark Logical flag to track execution times
-#' @param preload_models Preload all models at start (default TRUE)
-#' @param use_cache Use cached models (default TRUE)
+#' @param benchmark Logical; if \code{TRUE}, record/print timing information
+#' @param preload_models Logical; preload all models at start (default \code{TRUE})
+#' @param use_cache Logical; use cached models (default \code{TRUE})
 #'
 #' @return List of prevalence and cases predictions, plus benchmark times if benchmark=TRUE
 #' @export

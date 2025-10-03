@@ -5,7 +5,6 @@
 \title{Optimized Run Malaria Emulator with Batching (1:1 with Python defaults)}
 \usage{
 run_malaria_emulator(
-  db_path = NULL,
   param_index = NULL,
   scenarios = NULL,
   predictor = "prevalence",
@@ -22,8 +21,6 @@ run_malaria_emulator(
 )
 }
 \arguments{
-\item{db_path}{Path to DuckDB database (for database mode)}
-
 \item{param_index}{Parameter index for database mode (NULL for random)}
 
 \item{scenarios}{Data frame with scenario parameters (for scenario mode)}
@@ -48,13 +45,15 @@ run_malaria_emulator(
 
 \item{precision}{Precision control: "fp32" (default, matches Python visualizer) or "amp" (CUDA autocast)}
 
-\item{sim_agg}{Simulation aggregation in DB mode: "mean" (default, matches Python), "first", or "median"}
+\item{sim_agg}{Simulation aggregation in DB mode: "mean" (default), "first", or "median"}
 }
 \value{
-Data frame with columns: index, timestep, {predictor}, model_type
+A data frame with columns:
+\code{index}, \code{timestep}, \code{predictor} (the numeric column named
+according to the selected predictor, e.g. \code{prevalence} or \code{cases}),
+and \code{model_type}.
 }
 \description{
-Runs the emulator either in database mode (DuckDB-backed) or scenario mode (data.frame),
-using the schema-aware LSTM with options to align precision and simulation aggregation
-with your Python visualizer.
+Runs the emulator either in database mode scenario mode (data.frame),
+using the schema-aware LSTM with options to align precision and simulation aggregation.
 }

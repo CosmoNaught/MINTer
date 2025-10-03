@@ -19,8 +19,6 @@ create_scenario_plots <- function(results,
                                   window_size = 14,
                                   plot_tight = FALSE) {
   
-  library(ggplot2)
-  library(dplyr)
   
   # Auto-detect predictor if not specified
   if (is.null(predictor)) {
@@ -125,7 +123,7 @@ create_combined_scenario_plot <- function(plot_data, predictor, plot_tight = FAL
   
   # Define color palette for different scenarios
   n_scenarios <- length(unique(plot_data$scenario))
-  colors <- scales::hue_pal()(n_scenarios)
+  colors <- hue_pal()(n_scenarios)
   
   # Create y-axis label
   y_label <- ifelse(predictor == "prevalence", "Prevalence", "Cases per 1000")
@@ -170,7 +168,7 @@ create_combined_scenario_plot <- function(plot_data, predictor, plot_tight = FAL
   # Set y-axis limits based on predictor
   if (!plot_tight) {
     if (predictor == "prevalence") {
-      p <- p + scale_y_continuous(limits = c(0, 1), labels = scales::percent_format())
+      p <- p + scale_y_continuous(limits = c(0, 1), labels = percent_format())
     } else {
       # For cases, use data-driven limits
       y_max <- max(plot_data[[predictor]], na.rm = TRUE) * 1.1
@@ -179,7 +177,7 @@ create_combined_scenario_plot <- function(plot_data, predictor, plot_tight = FAL
   } else {
     # Tight scaling
     if (predictor == "prevalence") {
-      p <- p + scale_y_continuous(labels = scales::percent_format())
+      p <- p + scale_y_continuous(labels = percent_format())
     }
   }
   
@@ -253,14 +251,14 @@ create_individual_scenario_plot <- function(scenario_data, scenario_name,
   if (!plot_tight) {
     if (predictor == "prevalence") {
       p <- p + ggplot2::scale_y_continuous(limits = c(0, 1),
-                                           labels = scales::percent_format())
+                                           labels = percent_format())
     } else {
       y_max <- max(scenario_data[[predictor]], na.rm = TRUE) * 1.1
       p <- p + ggplot2::scale_y_continuous(limits = c(0, y_max))
     }
   } else {
     if (predictor == "prevalence") {
-      p <- p + ggplot2::scale_y_continuous(labels = scales::percent_format())
+      p <- p + ggplot2::scale_y_continuous(labels = percent_format())
     }
   }
 

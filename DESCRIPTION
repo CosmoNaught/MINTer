@@ -16,8 +16,6 @@ Depends:
     R (>= 4.1.0)
 Imports:
     reticulate (>= 1.41),
-    DBI,
-    duckdb,
     ggplot2,
     jsonlite,
     malariasimulation,
@@ -26,15 +24,17 @@ Imports:
     future.apply,
     progressr,
     dplyr,
-    tidyr,
+    magrittr,
     stats,
     rlang,
     estiMINT,
-    later,
+    scales,
     cli
 Suggests:
     testthat (>= 3.0.0),
     knitr,
+    later,
+    tidyr,
     rmarkdown
 Remotes:
     mrc-ide/malariasimulation,

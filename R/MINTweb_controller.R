@@ -19,8 +19,9 @@
 #' @param irs Numeric vector of current IRS coverage
 #' @param irs_future Numeric vector of future IRS coverage
 #' @param lsm Numeric vector of LSM coverage
-#' @param scenario_tag Optional character vector of scenario identifiers (default: NULL)
-#' @param clean_output Logical flag to clean output: removes columns and filters timesteps (default: FALSE)
+#' @param scenario_tag Optional character vector of scenario identifiers (default: \code{NULL})
+#' @param clean_output Logical; if \code{TRUE}, remove helper columns and filter timesteps (default \code{TRUE})
+#' @param tabulate Logical; if \code{TRUE}, aggregate \code{cases} into 4 quantile-like bins per scenario (default \code{TRUE})
 #'
 #' @return List containing prevalence and cases predictions as returned by run_minter_scenarios
 #' @export
