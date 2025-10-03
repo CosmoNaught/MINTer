@@ -10,7 +10,7 @@ get_cached_model(model_type)
 \item{model_type}{"eir_models", "nn_prevalence", or "nn_cases"}
 }
 \value{
-Cached model object (may trigger a load if absent)
+Cached model object
 }
 \description{
 Get Cached Models or Load if Missing

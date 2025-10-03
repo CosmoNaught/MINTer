@@ -2,15 +2,13 @@
 % Please edit documentation in R/zzz.R
 \name{initialize_python}
 \alias{initialize_python}
-\title{Initialize Python and source model helpers}
+\title{Initialize Python with Model Helpers}
 \usage{
 initialize_python(verbose = TRUE)
 }
 \arguments{
-\item{verbose}{logical; print progress}
+\item{verbose}{Print messages}
 }
 \description{
-Ensures required modules (numpy, pandas, torch, sklearn) are available in the
-reticulate-managed environment, optionally auto-installs them (set
-MINTER_AUTO_PY_INSTALL=true or run in CI), and sources the Python helper module.
+Initialize Python with Model Helpers
 }
