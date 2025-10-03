@@ -1,8 +1,11 @@
+# zzz.R — package init & Python/Model bootstrapping for MINTer
+
 .minter_cache <- new.env(parent = emptyenv())
 
-np <- NULL
-torch <- NULL
-pd <- NULL
+# Delayed-import placeholders (bound in .onLoad)
+np      <- NULL
+torch   <- NULL
+pd      <- NULL
 sklearn <- NULL
 
 # ---------- internal helpers -------------------------------------------------
@@ -12,55 +15,13 @@ sklearn <- NULL
   tolower(val) %in% c("1", "true", "yes")
 }
 
-# Prefer a stable, user-owned Python over ephemeral uv builds.
-.detect_python <- function() {
-  # 1) Respect explicit pin
-  p <- Sys.getenv("RETICULATE_PYTHON", unset = "")
-  if (nzchar(p)) return(path.expand(p))
-
-  # 2) Active virtualenv
-  ve <- Sys.getenv("VIRTUAL_ENV", unset = "")
-  if (nzchar(ve)) {
-    cand <- file.path(path.expand(ve), "bin", "python")
-    if (file.exists(cand)) return(cand)
-  }
-
-  # 3) pyenv real path (avoid shims if we can)
-  pyenv_bin <- Sys.which("pyenv")
-  if (nzchar(pyenv_bin)) {
-    res <- tryCatch(
-      system2(pyenv_bin, c("which", "python"), stdout = TRUE, stderr = FALSE),
-      error = function(e) character()
-    )
-    if (length(res) && nzchar(res[1])) {
-      cand <- path.expand(res[1])
-      if (file.exists(cand)) return(cand)
-    }
-    shim <- path.expand("~/.pyenv/shims/python")
-    if (file.exists(shim)) return(shim)
-  }
-
-  # 4) System python
-  for (cand in c(Sys.which("python3"), Sys.which("python"))) {
-    if (nzchar(cand) && file.exists(cand)) return(cand)
-  }
-
-  ""
-}
-
 .install_py_packages <- function(pkgs, verbose = TRUE) {
-  # Try reticulate's pip first (in the already-selected interpreter)
   ok <- tryCatch({
-    reticulate::py_install(
-      packages = pkgs,
-      envname = NULL,
-      method = "auto",
-      pip = TRUE
-    )
+    reticulate::py_install(packages = pkgs, envname = NULL, method = "auto", pip = TRUE)
     TRUE
   }, error = function(e) FALSE)
 
-  # If torch failed via default index, try CPU wheels fallback (no-op if not needed)
+  # Fallback for torch CPU wheels if needed
   if (!ok && "torch" %in% pkgs) {
     ok <- tryCatch({
       reticulate::py_run_string(
@@ -70,54 +31,57 @@ sklearn <- NULL
     }, error = function(e) FALSE)
   }
 
-  if (!ok) {
-    if (verbose) message("Automatic Python package installation failed.")
-  }
+  if (!ok && verbose) message("[WARN] Automatic Python package installation failed.")
   invisible(ok)
 }
 
 # ---------- lifecycle --------------------------------------------------------
 
 .onLoad <- function(libname, pkgname) {
-  # Default away from uv unless user explicitly opts in
-  if (identical(Sys.getenv("RETICULATE_USE_UV", unset = ""), "")) {
-    Sys.setenv(RETICULATE_USE_UV = "0")
-  }
+  # Let reticulate manage a per-package env (honors Config/reticulate in DESCRIPTION)
+  reticulate::configure_environment(pkgname)
 
-  # Choose a stable Python early (user can still override with RETICULATE_PYTHON)
-  py <- Sys.getenv("RETICULATE_PYTHON", unset = "")
-  if (!nzchar(py)) {
-    py <- .detect_python()
-    if (nzchar(py)) Sys.setenv(RETICULATE_PYTHON = py)
-  }
-  if (nzchar(py) && file.exists(path.expand(py))) {
-    # Soft preference now; hard requirement enforced in initialize_python()
-    try(reticulate::use_python(path.expand(py), required = FALSE), silent = TRUE)
-  }
+  # Ensure core Python deps are importable (module names)
+  # NOTE: sklearn is the import name (pip package is scikit-learn)
+  reticulate::py_require("numpy")
+  reticulate::py_require("pandas")
+  reticulate::py_require("torch")
+  reticulate::py_require("sklearn")
 
-  # Delayed imports (resolved on first actual use)
+  # Bind delayed imports so other funcs can reference them
   assign("np",      reticulate::import("numpy",  delay_load = TRUE), envir = parent.env(environment()))
   assign("torch",   reticulate::import("torch",  delay_load = TRUE), envir = parent.env(environment()))
   assign("pd",      reticulate::import("pandas", delay_load = TRUE), envir = parent.env(environment()))
   assign("sklearn", reticulate::import("sklearn",delay_load = TRUE), envir = parent.env(environment()))
 
-  # Requirement: initialize Python + preload models during load
-  initialize_python(verbose = TRUE)
-  preload_all_models(verbose = TRUE)
+  # Heavy work (Python init + model preload) — but NEVER during R CMD INSTALL test-load
+  if (!identical(Sys.getenv("R_INSTALL_PKG"), pkgname)) {
+    initialize_python(verbose = TRUE)
+    preload_all_models(verbose = TRUE)
+  }
+}
+
+.onAttach <- function(libname, pkgname) {
+  if (interactive()) {
+    packageStartupMessage("MINTer: Python initialized & models preloaded. (Set MINTER_AUTO_PY_INSTALL=true to allow auto-install in fresh envs.)")
+  }
 }
 
 # ---------- caching & loading -----------------------------------------------
 
 #' Preload All Models
 #'
-#' Pre-loads all models into cache for faster execution
-#' @param verbose Print loading messages
-#' @param force Force reload even if already cached
+#' Pre-loads all models into cache for faster execution.
+#' Loads:
+#'   - EIR models via estiMINT::load_xgb_model()
+#'   - Neural net emulators for 'prevalence' and 'cases' via load_emulator_models_cached()
+#'
+#' @param verbose logical; print progress
+#' @param force logical; force reload even if cached
 #' @export
 preload_all_models <- function(verbose = FALSE, force = FALSE) {
   if (!force) {
     all_loaded <- !is.null(.minter_cache$eir_models) &&
-                  !is.null(.minter_cache$case_models) &&
                   !is.null(.minter_cache$nn_prevalence) &&
                   !is.null(.minter_cache$nn_cases)
     if (all_loaded) {
@@ -130,13 +94,15 @@ preload_all_models <- function(verbose = FALSE, force = FALSE) {
 
   initialize_python(verbose = verbose)
 
+  # EIR models (estiMINT)
   if (force || is.null(.minter_cache$eir_models)) {
-    if (verbose) message("  - Loading EIR models...")
+    if (verbose) message("  - Loading EIR models (estiMINT::load_xgb_model)...")
     .minter_cache$eir_models <- estiMINT::load_xgb_model()
   } else if (verbose) {
     message("  - EIR models already cached")
   }
 
+  # Neural network emulator models for both predictors
   for (predictor in c("prevalence", "cases")) {
     cache_key <- paste0("nn_", predictor)
     if (force || is.null(.minter_cache[[cache_key]])) {
@@ -158,7 +124,7 @@ preload_all_models <- function(verbose = FALSE, force = FALSE) {
 #' Get Cached Models or Load if Missing
 #'
 #' @param model_type "eir_models", "nn_prevalence", or "nn_cases"
-#' @return Cached model object
+#' @return Cached model object (may trigger a load if absent)
 get_cached_model <- function(model_type) {
   model <- .minter_cache[[model_type]]
   if (is.null(model)) {
@@ -177,66 +143,59 @@ get_cached_model <- function(model_type) {
   model
 }
 
-#' Initialize Python with Model Helpers
+# ---------- Python bootstrap -------------------------------------------------
+
+#' Initialize Python and source model helpers
 #'
-#' @param verbose Print messages
+#' Ensures required modules (numpy, pandas, torch, sklearn) are available in the
+#' reticulate-managed environment, optionally auto-installs them (set
+#' MINTER_AUTO_PY_INSTALL=true or run in CI), and sources the Python helper module.
+#'
+#' @param verbose logical; print progress
 #' @export
 initialize_python <- function(verbose = TRUE) {
+  # If already initialized & helpers present, bail early
   if (reticulate::py_available(initialize = FALSE) &&
       reticulate::py_has_attr(reticulate::py, "batch_predict_scenarios")) {
     if (verbose) message("Python dependencies already initialized.")
     return(invisible(TRUE))
   }
 
-  # Default away from uv unless explicitly requested
-  if (identical(Sys.getenv("RETICULATE_USE_UV", unset = ""), "")) {
-    Sys.setenv(RETICULATE_USE_UV = "0")
-  }
-
-  # Choose interpreter (respect override)
-  py <- Sys.getenv("RETICULATE_PYTHON", unset = "")
-  if (!nzchar(py)) {
-    py <- .detect_python()
-    if (nzchar(py)) Sys.setenv(RETICULATE_PYTHON = py)
-  }
-  if (nzchar(py)) {
-    reticulate::use_python(path.expand(py), required = TRUE)
-  }
-
+  # Force interpreter startup (uses env configured in .onLoad)
   if (!reticulate::py_available(initialize = TRUE)) {
-    stop(
-      "Python is not available for MINTer. ",
-      "Set RETICULATE_PYTHON to a valid interpreter (e.g., ~/.pyenv/versions/<env>/bin/python) and restart R."
-    )
+    stop("Python is not available for MINTer. Ensure reticulate is configured and Python is installed.")
   }
 
   required_modules <- c("numpy", "pandas", "torch", "sklearn")
   missing <- required_modules[!vapply(required_modules, reticulate::py_module_available, logical(1))]
 
-  # Auto-install path for CI/docker (opt-in via env); keeps onLoad behavior but self-heals
   auto <- tolower(Sys.getenv("MINTER_AUTO_PY_INSTALL",
                              if (.in_ci()) "true" else "false")) %in% c("1","true","yes")
   if (length(missing) && auto) {
     if (verbose) message("[INFO] Installing missing Python packages: ", paste(missing, collapse = ", "))
-    .install_py_packages(missing, verbose = verbose)
-    # Recompute missing after attempted install
+    .install_py_packages(
+      # map module->pip where needed
+      pkgs = replace(missing, missing == "sklearn", "scikit-learn"),
+      verbose = verbose
+    )
+    # Re-check after attempted install
     missing <- required_modules[!vapply(required_modules, reticulate::py_module_available, logical(1))]
   }
 
   if (length(missing)) {
     cfg <- tryCatch(reticulate::py_config(), error = function(e) NULL)
-    py_exec <- if (!is.null(cfg)) cfg$python else Sys.getenv("RETICULATE_PYTHON")
+    py_exec <- if (!is.null(cfg)) cfg$python else "python"
     stop(
       sprintf(
         "Missing Python modules for MINTer: %s\nInstall them with:\n  %s -m pip install %s",
         paste(missing, collapse = ", "),
-        ifelse(nzchar(py_exec), py_exec, "python"),
-        paste(missing, collapse = " ")
+        py_exec,
+        paste(replace(missing, missing == "sklearn", "scikit-learn"), collapse = " ")
       )
     )
   }
 
-  # Force module loading so helpers can rely on them
+  # Touch modules so delay-load bindings are realized
   invisible(np); invisible(pd); invisible(torch); invisible(sklearn)
 
   # Source optimized helpers with fallback
@@ -257,12 +216,6 @@ initialize_python <- function(verbose = TRUE) {
   if (verbose) {
     cfg <- tryCatch(reticulate::py_config(), error = function(e) NULL)
     if (!is.null(cfg)) {
-      if (grepl("/\\.cache/uv/builds", cfg$python)) {
-        warning(
-          "Using a temporary uv Python interpreter at: ", cfg$python, "\n",
-          "Set RETICULATE_PYTHON to a stable interpreter (e.g., a pyenv/venv path) for reproducibility."
-        )
-      }
       message("Python dependencies initialized successfully (", cfg$python, ").")
     } else {
       message("Python dependencies initialized successfully.")

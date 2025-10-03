@@ -7,10 +7,15 @@
 preload_all_models(verbose = FALSE, force = FALSE)
 }
 \arguments{
-\item{verbose}{Print loading messages}
+\item{verbose}{logical; print progress}
 
-\item{force}{Force reload even if already cached}
+\item{force}{logical; force reload even if cached}
 }
 \description{
-Pre-loads all models into cache for faster execution
+Pre-loads all models into cache for faster execution.
+Loads:
+\itemize{
+\item EIR models via estiMINT::load_xgb_model()
+\item Neural net emulators for 'prevalence' and 'cases' via load_emulator_models_cached()
+}
 }
