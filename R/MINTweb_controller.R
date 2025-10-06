@@ -80,6 +80,8 @@ run_mintweb_controller <- function(
   if (clean_output) {
     # Process prevalence data
     if (!is.null(results$prevalence)) {
+      results$prevalence <- results$prevalence[ave(seq_len(nrow(results$prevalence)), results$prevalence$scenario, FUN = seq_along) > 52, ]
+      row.names(results$prevalence) <- NULL
       columns_to_remove <- c("index", "timestep", "model_type")
       cols_to_keep <- !names(results$prevalence) %in% columns_to_remove
       results$prevalence <- results$prevalence[, cols_to_keep, drop = FALSE]
@@ -118,6 +120,7 @@ run_mintweb_controller <- function(
           })
           results$cases <- do.call(rbind, out)
           rownames(results$cases) <- NULL
+          names(results$cases)[names(results$cases) == "cases"] <- "cases_per_1000"
         }
 
     }
