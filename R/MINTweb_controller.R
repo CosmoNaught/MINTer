@@ -92,37 +92,20 @@ run_mintweb_controller <- function(
       columns_to_remove <- c("index", "timestep","model_type")
       cols_to_keep <- !names(results$cases) %in% columns_to_remove
       results$cases <- results$cases[, cols_to_keep, drop = FALSE]
-        if (tabulate) {
-          df <- results$cases
-          # preserve original scenario order
-          scenarios <- as.character(df$scenario)
-          split_list <- split(df, factor(df$scenario, levels = unique(scenarios)))
-
-          out <- lapply(split_list, function(d) {
-            x <- as.numeric(d$cases)
-            valid <- is.finite(x)
-            n <- sum(valid)
-
-            totals <- numeric(4)
-            if (n > 0) {
-              o <- order(x[valid], na.last = NA)
-              ranks <- integer(n); ranks[o] <- seq_len(n)
-              bins <- floor((ranks - 1) * 4 / n) + 1  # 1..4
-              sums <- tapply(x[valid], bins, sum)
-              totals[as.integer(names(sums))] <- as.numeric(sums)
-            }
-
-            data.frame(
-              cases = totals,
-              scenario = d$scenario[1],
-              row.names = NULL
-            )
-          })
-          results$cases <- do.call(rbind, out)
-          rownames(results$cases) <- NULL
-          names(results$cases)[names(results$cases) == "cases"] <- "cases_per_1000"
-        }
-
+      if (tabulate) {
+        df <- results$cases
+        split_list <- split(df, factor(df$scenario, levels = unique(df$scenario)))
+        res <- lapply(split_list, function(d) {
+          x <- as.numeric(d$cases)[53:156]
+          data.frame(
+            cases_per_1000 = colSums(matrix(x, nrow = 26)),
+            scenario       = d$scenario[1],
+            row.names = NULL
+          )
+        })
+        results$cases <- do.call(rbind, res)
+        rownames(results$cases) <- NULL
+      }
     }
   }
   
