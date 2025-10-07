@@ -19,8 +19,9 @@
 #' @param irs Numeric vector of current IRS coverage
 #' @param irs_future Numeric vector of future IRS coverage
 #' @param lsm Numeric vector of LSM coverage
-#' @param scenario_tag Optional character vector of scenario identifiers (default: NULL)
-#' @param clean_output Logical flag to clean output: removes columns and filters timesteps (default: FALSE)
+#' @param scenario_tag Optional character vector of scenario identifiers (default: \code{NULL})
+#' @param clean_output Logical; if \code{TRUE}, remove helper columns and filter timesteps (default \code{TRUE})
+#' @param tabulate Logical; if \code{TRUE}, aggregate \code{cases} into 4 quantile-like bins per scenario (default \code{TRUE})
 #'
 #' @return List containing prevalence and cases predictions as returned by run_minter_scenarios
 #' @export
@@ -42,7 +43,8 @@ run_mintweb_controller <- function(
   irs_future,
   lsm,
   scenario_tag = NULL,
-  clean_output = TRUE
+  clean_output = TRUE,
+  tabulate = TRUE
 ) {
   # Call the main minter function with default values for technical parameters
   results <- run_minter_scenarios(
@@ -78,10 +80,8 @@ run_mintweb_controller <- function(
   if (clean_output) {
     # Process prevalence data
     if (!is.null(results$prevalence)) {
-      # Filter to only include timestep 52 onwards
-      results$prevalence <- results$prevalence[results$prevalence$timestep >= 52, ] # Remove first 2 years from sim
-      
-      # Remove index and timestep columns
+      results$prevalence <- results$prevalence[ave(seq_len(nrow(results$prevalence)), results$prevalence$scenario, FUN = seq_along) > 52, ]
+      row.names(results$prevalence) <- NULL
       columns_to_remove <- c("index", "timestep", "model_type")
       cols_to_keep <- !names(results$prevalence) %in% columns_to_remove
       results$prevalence <- results$prevalence[, cols_to_keep, drop = FALSE]
@@ -89,10 +89,23 @@ run_mintweb_controller <- function(
     
     # Process cases data
     if (!is.null(results$cases)) {
-      # Remove year column
-      columns_to_remove <- c("year")
+      columns_to_remove <- c("index", "timestep","model_type")
       cols_to_keep <- !names(results$cases) %in% columns_to_remove
       results$cases <- results$cases[, cols_to_keep, drop = FALSE]
+      if (tabulate) {
+        df <- results$cases
+        split_list <- split(df, factor(df$scenario, levels = unique(df$scenario)))
+        res <- lapply(split_list, function(d) {
+          x <- as.numeric(d$cases)[53:156]
+          data.frame(
+            cases_per_1000 = colSums(matrix(x, nrow = 26)),
+            scenario       = d$scenario[1],
+            row.names = NULL
+          )
+        })
+        results$cases <- do.call(rbind, res)
+        rownames(results$cases) <- NULL
+      }
     }
   }
   

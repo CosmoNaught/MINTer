@@ -22,7 +22,8 @@ run_mintweb_controller(
   irs_future,
   lsm,
   scenario_tag = NULL,
-  clean_output = TRUE
+  clean_output = TRUE,
+  tabulate = TRUE
 )
 }
 \arguments{
@@ -58,9 +59,11 @@ run_mintweb_controller(
 
 \item{lsm}{Numeric vector of LSM coverage}
 
-\item{scenario_tag}{Optional character vector of scenario identifiers (default: NULL)}
+\item{scenario_tag}{Optional character vector of scenario identifiers (default: \code{NULL})}
 
-\item{clean_output}{Logical flag to clean output: removes columns and filters timesteps (default: FALSE)}
+\item{clean_output}{Logical; if \code{TRUE}, remove helper columns and filter timesteps (default \code{TRUE})}
+
+\item{tabulate}{Logical; if \code{TRUE}, aggregate \code{cases} into 4 quantile-like bins per scenario (default \code{TRUE})}
 }
 \value{
 List containing prevalence and cases predictions as returned by run_minter_scenarios

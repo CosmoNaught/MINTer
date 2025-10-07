@@ -40,7 +40,6 @@ preload_all_models <- function(verbose = FALSE, force = FALSE) {
   # Check if already loaded (unless forcing)
   if (!force) {
     all_loaded <- !is.null(.minter_cache$eir_models) && 
-                  !is.null(.minter_cache$case_models) && 
                   !is.null(.minter_cache$nn_prevalence) && 
                   !is.null(.minter_cache$nn_cases)
     
@@ -58,18 +57,11 @@ preload_all_models <- function(verbose = FALSE, force = FALSE) {
   # Load EIR models
   if (force || is.null(.minter_cache$eir_models)) {
     if (verbose) message("  - Loading EIR models...")
-    .minter_cache$eir_models <- estiMINT::load_pretrained_eir_models()
+    .minter_cache$eir_models <- estiMINT::load_xgb_model()
   } else if (verbose) {
     message("  - EIR models already cached")
   }
   
-  # Load case models
-  if (force || is.null(.minter_cache$case_models)) {
-    if (verbose) message("  - Loading case models...")
-    .minter_cache$case_models <- estiMINT::load_pretrained_case_models()
-  } else if (verbose) {
-    message("  - Case models already cached")
-  }
   
   # Load neural network models for both predictors
   for (predictor in c("prevalence", "cases")) {
@@ -92,7 +84,7 @@ preload_all_models <- function(verbose = FALSE, force = FALSE) {
 
 #' Get Cached Models or Load if Missing
 #'
-#' @param model_type "eir", "cases", or "nn_prevalence", "nn_cases"
+#' @param model_type "eir_models", "nn_prevalence", or "nn_cases"
 #' @return Cached model object
 get_cached_model <- function(model_type) {
   model <- .minter_cache[[model_type]]
@@ -100,11 +92,8 @@ get_cached_model <- function(model_type) {
   if (is.null(model)) {
     # Load model if not in cache
     if (model_type == "eir_models") {
-      .minter_cache$eir_models <- estiMINT::load_pretrained_eir_models()
+      .minter_cache$eir_models <- estiMINT::load_xgb_model()
       model <- .minter_cache$eir_models
-    } else if (model_type == "case_models") {
-      .minter_cache$case_models <- estiMINT::load_pretrained_case_models()
-      model <- .minter_cache$case_models
     } else if (startsWith(model_type, "nn_")) {
       predictor <- sub("nn_", "", model_type)
       .minter_cache[[model_type]] <- load_emulator_models_cached(

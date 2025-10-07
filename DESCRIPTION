@@ -1,6 +1,6 @@
 Package: MINTer
 Title: Malaria INTervention Emulator in R
-Version: 0.3.0
+Version: 0.9.0
 Authors@R: c(
     person("Cosmo", "Santoni", email = "cosmo.santoni@imperial.ac.uk", 
            role = c("aut", "cre")))
@@ -16,8 +16,6 @@ Depends:
     R (>= 4.1.0)
 Imports:
     reticulate (>= 1.41),
-    DBI,
-    duckdb,
     ggplot2,
     jsonlite,
     malariasimulation,
@@ -26,18 +24,20 @@ Imports:
     future.apply,
     progressr,
     dplyr,
-    tidyr,
+    magrittr,
     stats,
     rlang,
     estiMINT,
-    later,
+    scales,
     cli
 Suggests:
     testthat (>= 3.0.0),
     knitr,
+    later,
+    tidyr,
     rmarkdown
 Remotes:
     mrc-ide/malariasimulation,
-    CosmoNaught/estiMINT
+    CosmoNaught/estiMINT@v1.0
 Config/testthat/edition: 3
 VignetteBuilder: knitr

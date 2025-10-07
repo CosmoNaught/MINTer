@@ -23,6 +23,7 @@ run_minter_scenarios(
   lsm,
   eir_models = "xgboost",
   prevalence_models = "LSTM",
+  cases_models = "LSTM",
   predictor = c("prevalence", "cases"),
   year_start = 2,
   year_end = 5,
@@ -47,7 +48,7 @@ run_minter_scenarios(
 
 \item{net_type_future}{Character vector of future net choices per scenario}
 
-\item{itn_future}{Numeric vector (0 - 1) of future ITN coverage per scenario}
+\item{itn_future}{Numeric vector (0–1) of future ITN coverage per scenario}
 
 \item{prev}{Numeric vector of malaria prevalence levels}
 
@@ -65,25 +66,28 @@ run_minter_scenarios(
 
 \item{lsm}{Numeric vector of LSM coverage}
 
-\item{eir_models}{Character vector of models to use for EIR prediction}
+\item{eir_models}{Character vector of models to use for EIR prediction (e.g., \code{"xgboost"})}
 
-\item{prevalence_models}{Character vector of models for prevalence prediction}
+\item{prevalence_models}{Character vector of models for prevalence prediction (e.g., \code{"LSTM"})}
 
-\item{predictor}{Character vector of predictors to run}
+\item{cases_models}{Character vector of models for cases prediction (e.g., \code{"LSTM"})}
+
+\item{predictor}{Character vector of predictors to run; one or both of \code{c("prevalence","cases")}}
 
 \item{year_start, year_end}{Integers for case-year range}
 
 \item{scenario_tag}{Optional character vector of scenario identifiers}
 
-\item{benchmark}{Logical flag to track execution times}
+\item{benchmark}{Logical; if \code{TRUE}, record/print timing information}
 
-\item{preload_models}{Preload all models at start (default TRUE)}
+\item{preload_models}{Logical; preload all models at start (default \code{TRUE})}
 
-\item{use_cache}{Use cached models (default TRUE)}
+\item{use_cache}{Logical; use cached models (default \code{TRUE})}
 }
 \value{
 List of prevalence and cases predictions, plus benchmark times if benchmark=TRUE
 }
 \description{
-Optimized Run MINT Scenarios for Malaria Intervention Analysis
+Runs vectorized scenario builds, predicts EIR, and batches neural-network
+inference for prevalence and/or cases.
 }

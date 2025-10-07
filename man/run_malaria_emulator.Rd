@@ -2,10 +2,9 @@
 % Please edit documentation in R/emulator_main.R
 \name{run_malaria_emulator}
 \alias{run_malaria_emulator}
-\title{Optimized Run Malaria Emulator with Batching}
+\title{Optimized Run Malaria Emulator with Batching (1:1 with Python defaults)}
 \usage{
 run_malaria_emulator(
-  db_path = NULL,
   param_index = NULL,
   scenarios = NULL,
   predictor = "prevalence",
@@ -13,15 +12,15 @@ run_malaria_emulator(
   counterfactual = NULL,
   window_size = 14,
   device = NULL,
-  model_types = c("GRU", "LSTM"),
+  model_types = c("LSTM"),
   time_steps = 2190,
   use_cache = TRUE,
-  benchmark = FALSE
+  benchmark = FALSE,
+  precision = c("fp32", "amp"),
+  sim_agg = c("mean", "first", "median")
 )
 }
 \arguments{
-\item{db_path}{Path to DuckDB database (for database mode)}
-
 \item{param_index}{Parameter index for database mode (NULL for random)}
 
 \item{scenarios}{Data frame with scenario parameters (for scenario mode)}
@@ -30,23 +29,31 @@ run_malaria_emulator(
 
 \item{models_base_dir}{Base directory with trained models (NULL for bundled)}
 
-\item{counterfactual}{Named list for counterfactual analysis}
+\item{counterfactual}{Named list for counterfactual analysis (DB mode; first simulation only)}
 
-\item{window_size}{Window size for rolling average}
+\item{window_size}{Window size for rolling average (days)}
 
-\item{device}{"cpu" or "cuda"}
+\item{device}{"cpu" or "cuda" (NULL = auto)}
 
-\item{model_types}{Vector of model types ("GRU", "LSTM", or both)}
+\item{model_types}{Vector of model types (currently only "LSTM" is supported)}
 
 \item{time_steps}{Number of time steps for predictions (in days)}
 
 \item{use_cache}{Use cached models (default TRUE)}
 
 \item{benchmark}{Track detailed timing (default FALSE)}
+
+\item{precision}{Precision control: "fp32" (default, matches Python visualizer) or "amp" (CUDA autocast)}
+
+\item{sim_agg}{Simulation aggregation in DB mode: "mean" (default), "first", or "median"}
 }
 \value{
-Data frame with columns: index, timestep, value, model_type
+A data frame with columns:
+\code{index}, \code{timestep}, \code{predictor} (the numeric column named
+according to the selected predictor, e.g. \code{prevalence} or \code{cases}),
+and \code{model_type}.
 }
 \description{
-Optimized Run Malaria Emulator with Batching
+Runs the emulator either in database mode scenario mode (data.frame),
+using the schema-aware LSTM with options to align precision and simulation aggregation.
 }

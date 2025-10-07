@@ -1,3 +1,5 @@
+# emulator_functions.R
+
 #' Load Emulator Models with Caching
 #'
 #' @param models_base_dir Base directory (NULL for bundled)
@@ -67,48 +69,61 @@ load_emulator_models_cached <- function(models_base_dir = NULL,
                     "seasonal", "routine", "itn_use", "irs_use", 
                     "itn_future", "irs_future", "lsm")
   
+  after9_covars <- c("dn0_future", "itn_future", "irs_future", "lsm", "routine")
+  intervention_day <- 9 * 365
+  
   # Model configuration
   use_cyclical_time <- training_args$use_cyclical_time %||% TRUE
-  input_size <- ifelse(use_cyclical_time, 2 + length(static_covars), 1 + length(static_covars))
-  hidden_size <- training_args$hidden_size %||% 256
-  num_layers <- training_args$num_layers %||% 4
-  dropout <- training_args$dropout %||% 0.05
+  eps_prevalence <- training_args$eps_prevalence %||% 1e-5
+  event_jitter_days <- training_args$event_jitter_days %||% 7
   
-  # Load models using optimized Python loading
-  gru_path <- file.path(predictor_models_dir, "gru_best.pt")
+  # Load LSTM model with schema inference
   lstm_path <- file.path(predictor_models_dir, "lstm_best.pt")
   
-  # Load both models in one Python call to minimize overhead
+  if (verbose) message(sprintf("[INFO] Loading LSTM model from %s", lstm_path))
+  
+  # Call Python function to load model and infer schema
   reticulate::py_run_string(sprintf("
 import warnings
 warnings.filterwarnings('ignore')
 
-# Load and prepare models in one go
-gru_model, gru_hidden, gru_layers = load_model_from_checkpoint(
-    '%s', %d, %d, 1, %f, %d, 'gru', '%s'
+# Load LSTM model with schema inference
+lstm_model, lstm_schema = load_model_from_checkpoint(
+    '%s', 
+    static_n=%d, 
+    predictor='%s',
+    device=torch.device('%s'),
+    use_cyclical_time=%s
 )
-lstm_model, lstm_hidden, lstm_layers = load_model_from_checkpoint(
-    '%s', %d, %d, 1, %f, %d, 'lstm', '%s'
-)
-
-# Move to device and set to eval mode
-gru_model = gru_model.to(torch.float32).to(torch.device('%s')).eval()
-lstm_model = lstm_model.to(torch.float32).to(torch.device('%s')).eval()
-", gru_path, input_size, hidden_size, dropout, num_layers, predictor,
-   lstm_path, input_size, hidden_size, dropout, num_layers, predictor,
-   device, device))
+", lstm_path, length(static_covars), predictor, device, 
+   ifelse(use_cyclical_time, "True", "False")))
+  
+  # Extract schema from Python
+  lstm_schema <- reticulate::py$lstm_schema
+  
+  if (verbose) {
+    message(sprintf("[INFO] LSTM model loaded successfully"))
+    message(sprintf("[INFO] Expected input features: %d", lstm_schema$expected_in))
+    message(sprintf("[INFO] Schema: cyc=%s, year_idx=%s, lag=%s, events=%d, extra2=%d",
+                   lstm_schema$cyc, lstm_schema$add_year_idx, 
+                   lstm_schema$include_lag, lstm_schema$events_n, lstm_schema$extra2))
+  }
   
   # Create model object
   models <- list(
-    gru_model = reticulate::py$gru_model,
     lstm_model = reticulate::py$lstm_model,
+    lstm_schema = lstm_schema,
     static_scaler = static_scaler,
     static_covars = static_covars,
+    after9_covars = after9_covars,
+    intervention_day = intervention_day,
     use_cyclical_time = use_cyclical_time,
     predictor = predictor,
     device = device_obj,
     training_args = training_args,
-    models_dir = predictor_models_dir
+    models_dir = predictor_models_dir,
+    eps_prevalence = eps_prevalence,
+    event_jitter_days = event_jitter_days
   )
   
   # Cache the models
@@ -274,256 +289,168 @@ print(f'[INFO] LSTM model loaded: hidden_size={lstm_hidden}, num_layers={lstm_la
   ))
 }
 
-#' Run Emulator for a Parameter
-#'
-#' @param db_path Path to DuckDB database
-#' @param param_index Parameter index to analyze
-#' @param models List from load_emulator_models()
-#' @param window_size Window size for rolling average
-#' @param counterfactual Named list with parameter name and values (optional)
-#' @param output_dir Directory to save outputs
-#' @param plot_tight Use tight y-axis scaling
-#' @param model_types Vector of model types to use
-#'
-#' @return List with predictions and plot
-#' @export
-run_emulator <- function(db_path, 
-                        param_index,
-                        models,
-                        window_size = 14,
-                        counterfactual = NULL,
-                        output_dir = NULL,
-                        plot_tight = FALSE,
-                        model_types = c("GRU", "LSTM")) {
-  
-  # Validate model types
-  model_types <- match.arg(model_types, c("GRU", "LSTM"), several.ok = TRUE)
-  
-  # Fetch data
-  df <- fetch_rolling_data(db_path, "simulation_results", window_size, 
-                          param_index, models$predictor)
-  
-  df[models$static_covars] <- 
-    lapply(df[models$static_covars], function(x) as.numeric(x))
-  
-  if (nrow(df) == 0) {
-    stop(sprintf("No data found for parameter index %d", param_index))
+#' Create event pulse features
+#' @keywords internal
+create_event_pulses <- function(abs_t, events, jitter_days) {
+  if (length(events) == 0) {
+    return(rep(0, length(abs_t)))
   }
   
-  # Get global index
-  global_index <- as.numeric(unique(df$global_index)[1])
+  sig <- jitter_days
+  result <- numeric(length(abs_t))
   
-  message(sprintf("\n[INFO] Parameter Information:"))
-  message(sprintf("  - Parameter Index: %d", param_index))
-  message(sprintf("  - Global Index: %d", global_index))
-  message(sprintf("  - Corresponding RDS file: simulation_results_%d.rds", global_index))
-  
-  # Group by simulation
-  sim_groups <- split(df, df$simulation_index)
-  num_sims <- length(sim_groups)
-  message(sprintf("[INFO] Parameter %d has %d simulations", param_index, num_sims))
-  
-  # Print parameter values
-  first_sim <- sim_groups[[1]]
-  param_values <- first_sim[1, models$static_covars]
-  message("\n[INFO] Input Parameter Values:")
-  for (param_name in names(param_values)) {
-    message(sprintf("  - %s: %g", param_name, param_values[[param_name]]))
+  for (i in seq_along(abs_t)) {
+    result[i] <- sum(exp(-0.5 * ((abs_t[i] - events) / sig)^2))
   }
   
-  # Import numpy
-  np <- reticulate::import("numpy")
+  return(result)
+}
+
+#' Create time-since-event features
+#' @keywords internal
+create_time_since <- function(abs_t, events) {
+  if (length(events) == 0) {
+    return(rep(0, length(abs_t)))
+  }
   
-  # Prepare for plotting
-  target_column <- ifelse(models$predictor == "prevalence", "prevalence", "cases")
-  all_predictions <- list()
-  cf_predictions <- list()
+  result <- numeric(length(abs_t))
   
-  # Create plot
-  plot_data <- list()
+  for (i in seq_along(abs_t)) {
+    idx <- sum(events <= abs_t[i])
+    if (idx == 0) {
+      result[i] <- 0
+    } else {
+      result[i] <- max(0, (abs_t[i] - events[idx]) / 365)
+    }
+  }
   
-  # Process each simulation
-  for (sim_idx in names(sim_groups)) {
-    sim_df <- sim_groups[[sim_idx]]
-    sim_df <- sim_df[order(sim_df$timesteps), ]
+  return(result)
+}
+
+#' Prepare input features with full schema support
+#' @keywords internal
+prepare_input_features_schema <- function(df, models, window_size) {
+  T_len <- nrow(df)
+  abs_t <- df$abs_timesteps
+  rel_t <- df$timesteps
+  schema <- models$lstm_schema
+  
+  # Base static features
+  row0 <- df[1, ]
+  base_static <- as.numeric(row0[models$static_covars])
+  raw_matrix <- matrix(rep(base_static, T_len), nrow = T_len, byrow = TRUE)
+  
+  # Gate future-only covariates before intervention
+  post_mask <- abs_t >= models$intervention_day
+  for (cov in models$after9_covars) {
+    j <- which(models$static_covars == cov)
+    raw_matrix[!post_mask, j] <- 0.0
+  }
+  
+  # Scale static features
+  scaled <- models$static_scaler$transform(raw_matrix)
+  
+  # Build feature columns based on schema
+  cols <- list()
+  
+  # Time encoding
+  if (schema$cyc) {
+    day_of_year <- abs_t %% 365
+    sin_t <- sin(2 * pi * day_of_year / 365)
+    cos_t <- cos(2 * pi * day_of_year / 365)
+    cols[[length(cols) + 1]] <- cbind(sin_t, cos_t)
+  } else {
+    t_min <- min(rel_t)
+    t_max <- max(rel_t)
+    t_norm <- if (t_max > t_min) (rel_t - t_min) / (t_max - t_min) else rel_t
+    cols[[length(cols) + 1]] <- matrix(t_norm, ncol = 1)
+  }
+  
+  # Year index
+  if (schema$add_year_idx) {
+    cols[[length(cols) + 1]] <- matrix(abs_t / 365, ncol = 1)
+  }
+  
+  # Static covariates
+  cols[[length(cols) + 1]] <- scaled
+  
+  # Extra post-intervention features
+  if (schema$extra2 == 2) {
+    post9 <- as.numeric(abs_t >= models$intervention_day)
+    t_since9_years <- pmax(0, abs_t - models$intervention_day) / 365
+    cols[[length(cols) + 1]] <- cbind(post9, t_since9_years)
+  }
+  
+  # Lagged target (if needed)
+  if (schema$include_lag) {
+    target_col <- if (models$predictor == "prevalence") "prevalence" else "cases"
+    y <- df[[target_col]]
+    # Transform target
+    if (models$predictor == "prevalence") {
+      y_clip <- pmin(pmax(y, models$eps_prevalence), 1 - models$eps_prevalence)
+      y_tf <- log(y_clip / (1 - y_clip))
+    } else {
+      y_tf <- log1p(pmax(y, 0))
+    }
+    y_lag <- c(y_tf[1], y_tf[-length(y_tf)])
+    cols[[length(cols) + 1]] <- matrix(y_lag, ncol = 1)
+  }
+  
+  # Event features
+  if (schema$events_n == 9) {
+    itn_future <- as.numeric(row0$itn_future)
     
-    # Get data
-    t <- as.numeric(sim_df$timesteps)
-    y_true <- as.numeric(sim_df[[target_column]])
+    # ITN events
+    if (itn_future > 0) {
+      itn_events <- c(0, 1095, 2190, 3285)
+    } else {
+      itn_events <- c(0)  # Historical only
+    }
     
-    # For consistency, always use actual timesteps (not scaled)
-    t_plot <- t
+    # IRS events
+    irs_all <- seq(0, 4380, by = 365)
+    irs_future <- as.numeric(row0$irs_future)
+    if (irs_future > 0) {
+      irs_events <- irs_all
+    } else {
+      irs_events <- irs_all[irs_all < models$intervention_day]
+    }
     
-    # Add actual data to plot
-    plot_data[[length(plot_data) + 1]] <- data.frame(
-      timestep = t_plot,
-      value = y_true,
-      type = "Actual",
-      simulation = sim_idx
+    # LSM events
+    lsm <- as.numeric(row0$lsm)
+    lsm_events <- if (lsm > 0) c(3285) else numeric(0)
+    
+    # Create pulse and time-since features
+    p_itn <- create_event_pulses(abs_t, itn_events, models$event_jitter_days)
+    p_irs <- create_event_pulses(abs_t, irs_events, models$event_jitter_days)
+    p_lsm <- create_event_pulses(abs_t, lsm_events, models$event_jitter_days)
+    
+    is_post_itn <- if (itn_future > 0) as.numeric(abs_t >= models$intervention_day) else rep(0, T_len)
+    is_post_irs <- as.numeric(abs_t >= (if (length(irs_events) > 0) irs_events[1] else 1e9))
+    is_post_lsm <- if (length(lsm_events) > 0) as.numeric(abs_t >= 3285) else rep(0, T_len)
+    
+    tau_itn <- create_time_since(abs_t, itn_events)
+    tau_irs <- create_time_since(abs_t, irs_events)
+    tau_lsm <- create_time_since(abs_t, lsm_events)
+    
+    event_matrix <- cbind(
+      p_itn, p_irs, p_lsm,
+      is_post_itn, is_post_irs, is_post_lsm,
+      tau_itn, tau_irs, tau_lsm
     )
     
-    # Prepare inputs
-    static_vals <- as.numeric(sim_df[1, models$static_covars])
-    static_vals_scaled <- models$static_scaler$transform(matrix(static_vals, nrow = 1))
-    
-    # Build input features
-    T_len <- nrow(sim_df)
-    
-    if (models$use_cyclical_time) {
-      if (models$predictor == "cases") {
-        day_of_year <- (t * window_size) %% 365
-      } else {
-        day_of_year <- t %% 365
-      }
-      
-      sin_t <- sin(2 * pi * day_of_year / 365)
-      cos_t <- cos(2 * pi * day_of_year / 365)
-      
-      X_full <- matrix(0, nrow = T_len, ncol = 2 + length(models$static_covars))
-      X_full[, 1] <- sin_t
-      X_full[, 2] <- cos_t
-      X_full[, 3:ncol(X_full)] <- rep(static_vals_scaled, each = T_len)
-    } else {
-      t_norm <- (t - min(t)) / (max(t) - min(t))
-      X_full <- matrix(0, nrow = T_len, ncol = 1 + length(models$static_covars))
-      X_full[, 1] <- t_norm
-      X_full[, 2:ncol(X_full)] <- rep(static_vals_scaled, each = T_len)
-    }
-    
-    # Get predictions using Python
-    X_full_np <- np$array(X_full, dtype = np$float32)
-    
-    if ("GRU" %in% model_types) {
-      y_gru <- reticulate::py$predict_full_sequence(models$gru_model, X_full_np, models$device)
-    }
-    if ("LSTM" %in% model_types) {
-      y_lstm <- reticulate::py$predict_full_sequence(models$lstm_model, X_full_np, models$device)
-    }
-    
-    # Store predictions
-    for (i in 1:length(t)) {
-      pred_item <- list(
-        parameter_index = param_index,
-        simulation_index = as.numeric(sim_idx),
-        global_index = as.numeric(global_index),
-        timestep = t_plot[i],
-        true_value = y_true[i]
-      )
-      
-      if ("GRU" %in% model_types) {
-        pred_item$gru_prediction <- y_gru[i]
-      }
-      if ("LSTM" %in% model_types) {
-        pred_item$lstm_prediction <- y_lstm[i]
-      }
-      
-      all_predictions[[length(all_predictions) + 1]] <- pred_item
-    }
-    
-    # Only plot first simulation's predictions
-    if (sim_idx == names(sim_groups)[1]) {
-      if ("GRU" %in% model_types) {
-        plot_data[[length(plot_data) + 1]] <- data.frame(
-          timestep = t_plot,
-          value = y_gru,
-          type = "GRU",
-          simulation = sim_idx
-        )
-      }
-      
-      if ("LSTM" %in% model_types) {
-        plot_data[[length(plot_data) + 1]] <- data.frame(
-          timestep = t_plot,
-          value = y_lstm,
-          type = "LSTM", 
-          simulation = sim_idx
-        )
-      }
-      
-      # Run counterfactual if requested
-      if (!is.null(counterfactual)) {
-        cf_param_name <- names(counterfactual)[1]
-        cf_values <- counterfactual[[1]]
-        
-        for (cf_val in cf_values) {
-          # Modify parameter value
-          cf_static_vals <- static_vals
-          param_idx <- which(models$static_covars == cf_param_name)
-          cf_static_vals[param_idx] <- cf_val
-          
-          # Scale and build features
-          cf_static_scaled <- models$static_scaler$transform(matrix(cf_static_vals, nrow = 1))
-          
-          if (models$use_cyclical_time) {
-            X_cf <- X_full
-            X_cf[, 3:ncol(X_cf)] <- rep(cf_static_scaled, each = T_len)
-          } else {
-            X_cf <- X_full
-            X_cf[, 2:ncol(X_cf)] <- rep(cf_static_scaled, each = T_len)
-          }
-          
-          # Get counterfactual predictions
-          X_cf_np <- np$array(X_cf, dtype = np$float32)
-          
-          if ("GRU" %in% model_types) {
-            cf_gru <- reticulate::py$predict_full_sequence(models$gru_model, X_cf_np, models$device)
-            plot_data[[length(plot_data) + 1]] <- data.frame(
-              timestep = t_plot,
-              value = cf_gru,
-              type = sprintf("GRU %s=%g", cf_param_name, cf_val),
-              simulation = sim_idx
-            )
-          }
-          
-          if ("LSTM" %in% model_types) {
-            cf_lstm <- reticulate::py$predict_full_sequence(models$lstm_model, X_cf_np, models$device)
-            plot_data[[length(plot_data) + 1]] <- data.frame(
-              timestep = t_plot,
-              value = cf_lstm,
-              type = sprintf("LSTM %s=%g", cf_param_name, cf_val),
-              simulation = sim_idx
-            )
-          }
-        }
-      }
-    }
+    cols[[length(cols) + 1]] <- event_matrix
   }
   
-  # Combine plot data
-  plot_df <- dplyr::bind_rows(plot_data)
+  # Combine all features
+  X <- do.call(cbind, cols)
   
-  # Create unified plot
-  title_text <- sprintf("%s - Parameter Index = %d | Global Index = %d\n(%d Simulations)",
-                       ifelse(models$predictor == "prevalence", "Prevalence", "Cases per 1000"),
-                       param_index, global_index, num_sims)
-  
-  p <- create_unified_plot(plot_df, models$predictor, title_text, window_size, plot_tight)
-  
-  # Save outputs if directory specified
-  if (!is.null(output_dir)) {
-    dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
-    
-    # Save plot
-    plot_filename <- sprintf("%s_parameter_%d_global_%d_predictions%s.png",
-                           models$predictor, param_index, global_index,
-                           ifelse(plot_tight, "_tight", ""))
-    ggplot2::ggsave(file.path(output_dir, plot_filename), p, width = 10, height = 6)
-    
-    # Save predictions
-    pred_df <- dplyr::bind_rows(all_predictions)
-    utils::write.csv(pred_df, file.path(output_dir, 
-                                sprintf("%s_parameter_%d_global_%d_predictions.csv",
-                                       models$predictor, param_index, global_index)))
-    
-    message(sprintf("[INFO] Saved outputs to %s", output_dir))
+  # Verify dimensions
+  if (ncol(X) != schema$expected_in) {
+    stop(sprintf("Feature width %d != checkpoint expected %d", ncol(X), schema$expected_in))
   }
   
-  return(list(
-    plot = p,
-    predictions = dplyr::bind_rows(all_predictions),
-    param_index = param_index,
-    global_index = global_index
-  ))
+  return(X)
 }
 
 #' Generate Scenario Predictions

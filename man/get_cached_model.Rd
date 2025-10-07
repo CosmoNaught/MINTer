@@ -7,7 +7,7 @@
 get_cached_model(model_type)
 }
 \arguments{
-\item{model_type}{"eir", "cases", or "nn_prevalence", "nn_cases"}
+\item{model_type}{"eir_models", "nn_prevalence", or "nn_cases"}
 }
 \value{
 Cached model object

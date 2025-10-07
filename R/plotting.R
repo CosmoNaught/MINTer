@@ -19,8 +19,6 @@ create_scenario_plots <- function(results,
                                   window_size = 14,
                                   plot_tight = FALSE) {
   
-  library(ggplot2)
-  library(dplyr)
   
   # Auto-detect predictor if not specified
   if (is.null(predictor)) {
@@ -125,7 +123,7 @@ create_combined_scenario_plot <- function(plot_data, predictor, plot_tight = FAL
   
   # Define color palette for different scenarios
   n_scenarios <- length(unique(plot_data$scenario))
-  colors <- scales::hue_pal()(n_scenarios)
+  colors <- hue_pal()(n_scenarios)
   
   # Create y-axis label
   y_label <- ifelse(predictor == "prevalence", "Prevalence", "Cases per 1000")
@@ -162,7 +160,6 @@ create_combined_scenario_plot <- function(plot_data, predictor, plot_tight = FAL
       legend.text = element_text(size = 9)
     )
   
-  # Add vertical line at year 1 (year 3 in original timeline) if it exists
   if (1 >= 0 && 1 <= 4) {
     p <- p + geom_vline(xintercept = 1, linetype = "dotted", 
                        color = "gray50", alpha = 0.5)
@@ -171,7 +168,7 @@ create_combined_scenario_plot <- function(plot_data, predictor, plot_tight = FAL
   # Set y-axis limits based on predictor
   if (!plot_tight) {
     if (predictor == "prevalence") {
-      p <- p + scale_y_continuous(limits = c(0, 1), labels = scales::percent_format())
+      p <- p + scale_y_continuous(limits = c(0, 1), labels = percent_format())
     } else {
       # For cases, use data-driven limits
       y_max <- max(plot_data[[predictor]], na.rm = TRUE) * 1.1
@@ -180,7 +177,7 @@ create_combined_scenario_plot <- function(plot_data, predictor, plot_tight = FAL
   } else {
     # Tight scaling
     if (predictor == "prevalence") {
-      p <- p + scale_y_continuous(labels = scales::percent_format())
+      p <- p + scale_y_continuous(labels = percent_format())
     }
   }
   
@@ -203,64 +200,71 @@ create_combined_scenario_plot <- function(plot_data, predictor, plot_tight = FAL
 #' @return ggplot object
 create_individual_scenario_plot <- function(scenario_data, scenario_name, 
                                            predictor, plot_tight = FALSE) {
-  
+
   # Create y-axis label
   y_label <- ifelse(predictor == "prevalence", "Prevalence", "Cases per 1000")
-  
-  # Define colors for model types
-  model_colors <- c("GRU" = "#E41A1C", "LSTM" = "#377EB8", "Actual" = "black")
-  
-  p <- ggplot(scenario_data, aes(x = years, y = .data[[predictor]], 
-                                 color = model_type)) +
-    geom_line(size = 1.2) +
-    scale_color_manual(values = model_colors, breaks = names(model_colors)) +
-    scale_x_continuous(
+
+  # Define colors for model types (adds LSTM+estiMINT)
+  model_colors <- c(
+    "GRU" = "#E41A1C",
+    "LSTM" = "#377EB8",
+    "LSTM+estiMINT" = "#4DAF4A",
+    "Actual" = "black"
+  )
+
+  p <- ggplot2::ggplot(scenario_data, ggplot2::aes(x = years, y = .data[[predictor]], 
+                                                   color = model_type)) +
+    ggplot2::geom_line(size = 1.2) +
+    ggplot2::scale_color_manual(values = model_colors, breaks = names(model_colors)) +
+    ggplot2::scale_x_continuous(
       name = "Years",
       breaks = 0:4,
       labels = 0:4,
       limits = c(0, 4),
       expand = c(0.02, 0.02)
     ) +
-    labs(
+    ggplot2::labs(
       title = sprintf("%s - %s Prediction", scenario_name, y_label),
       subtitle = "Years 2-6 of simulation (displayed as 0-4)",
       y = y_label,
       color = "Model"
     ) +
-    theme_minimal() +
-    theme(
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
       legend.position = "top",
-      panel.grid.minor = element_blank(),
-      panel.background = element_rect(fill = "white", color = NA),
-      plot.background = element_rect(fill = "white", color = NA),
-      plot.title = element_text(size = 14, face = "bold"),
-      plot.subtitle = element_text(size = 10, color = "gray40"),
-      axis.title = element_text(size = 11),
-      legend.title = element_text(size = 10, face = "bold")
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.background = ggplot2::element_rect(fill = "white", color = NA),
+      plot.background  = ggplot2::element_rect(fill = "white", color = NA),
+      plot.title = ggplot2::element_text(size = 14, face = "bold"),
+      plot.subtitle = ggplot2::element_text(size = 10, color = "gray40"),
+      axis.title = ggplot2::element_text(size = 11),
+      legend.title = ggplot2::element_text(size = 10, face = "bold")
     )
-  
+
   # Add vertical line at year 1
   if (1 >= 0 && 1 <= 4) {
-    p <- p + geom_vline(xintercept = 1, linetype = "dotted", 
-                       color = "gray50", alpha = 0.5)
+    p <- p + ggplot2::geom_vline(xintercept = 1, linetype = "dotted",
+                                 color = "gray50", alpha = 0.5)
   }
-  
+
   # Set y-axis limits
   if (!plot_tight) {
     if (predictor == "prevalence") {
-      p <- p + scale_y_continuous(limits = c(0, 1), labels = scales::percent_format())
+      p <- p + ggplot2::scale_y_continuous(limits = c(0, 1),
+                                           labels = percent_format())
     } else {
       y_max <- max(scenario_data[[predictor]], na.rm = TRUE) * 1.1
-      p <- p + scale_y_continuous(limits = c(0, y_max))
+      p <- p + ggplot2::scale_y_continuous(limits = c(0, y_max))
     }
   } else {
     if (predictor == "prevalence") {
-      p <- p + scale_y_continuous(labels = scales::percent_format())
+      p <- p + ggplot2::scale_y_continuous(labels = percent_format())
     }
   }
-  
+
   return(p)
 }
+
 
 
 #' Quick plot function for interactive use
