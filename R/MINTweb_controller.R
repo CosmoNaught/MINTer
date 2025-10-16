@@ -106,9 +106,10 @@ run_mintweb_controller <- function(
         results$cases <- do.call(rbind, res)
         rownames(results$cases) <- NULL
       }
+      results$cases[] <- lapply(results$cases, function(x) if (is.numeric(x)) pmax(x, 0, na.rm = TRUE) else x)
     }
   }
-  
+
   # Return the results
   return(results)
 }
