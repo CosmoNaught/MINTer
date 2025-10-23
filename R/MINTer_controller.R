@@ -231,6 +231,7 @@ run_minter_scenarios <- function(
     eir <- Reduce(`+`, eir_predictions) / length(eir_predictions)
     eir_values[i] <- eir
 
+
     # Store scenario
     all_scenarios[[i]] <- list(
       eir = eir,
@@ -253,7 +254,14 @@ run_minter_scenarios <- function(
     bench_times$run_eir_models <- as.numeric(difftime(Sys.time(), t_start, units = "secs"))
   }
   
-  # ---- Create scenario data frames for batch processing ----
+  # ---- Compute EIR validity + create scenario data frames for batch processing ----
+  eir_valid <- eir_values >= 0.68 & eir_values <= 371.0
+  scenario_meta <- data.frame(
+    scenario_tag = scenario_ids,
+    eir_valid    = eir_valid,
+    stringsAsFactors = FALSE
+  )
+
   scenarios_df <- do.call(rbind, lapply(all_scenarios, function(s) {
     data.frame(
       eir = s$eir,
@@ -268,6 +276,7 @@ run_minter_scenarios <- function(
       itn_future = s$itn_future,
       irs_future = s$irs_future,
       lsm = s$lsm,
+      scenario_tag = s$scenario_id,
       stringsAsFactors = FALSE
     )
   }))
@@ -288,8 +297,11 @@ run_minter_scenarios <- function(
     )
     
     # Add scenario IDs
-    prevalence_results$scenario <- rep(scenario_ids, 
-                                      each = nrow(prevalence_results) / n_scenarios)
+    rows_per_scn <- nrow(prevalence_results) / n_scenarios
+    prevalence_results$scenario      <- rep(scenario_ids, each = rows_per_scn)
+    prevalence_results$scenario_tag  <- prevalence_results$scenario
+    prevalence_results$eir_valid     <- rep(eir_valid,    each = rows_per_scn)
+
     results$prevalence <- prevalence_results
     
     if (benchmark) {
@@ -314,8 +326,10 @@ run_minter_scenarios <- function(
     )
     
     # Add scenario IDs
-    cases_results$scenario <- rep(scenario_ids, 
-                                      each = nrow(cases_results) / n_scenarios)
+    rows_per_scn <- nrow(cases_results) / n_scenarios
+    cases_results$scenario      <- rep(scenario_ids, each = rows_per_scn)
+    cases_results$scenario_tag  <- cases_results$scenario
+    cases_results$eir_valid     <- rep(eir_valid,    each = rows_per_scn)
     results$cases <- cases_results
     
     if (benchmark) {
@@ -426,6 +440,8 @@ run_minter_scenarios <- function(
     
     cat("====================================\n\n")
   }
-  
+
+  results$scenario_meta <- scenario_meta
+  results$eir_valid <- any(eir_valid)
   return(results)
 }
