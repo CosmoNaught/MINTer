@@ -231,6 +231,11 @@ run_minter_scenarios <- function(
     eir <- Reduce(`+`, eir_predictions) / length(eir_predictions)
     eir_values[i] <- eir
 
+    # Define effective LSM according to proportion of py_ppf
+    lsm_eff <- lsm[i]
+    if (!is.na(py_ppf[i]) && py_ppf[i] > 0) {
+      lsm_eff <- min(py_ppf[i] * 0.248 + lsm_eff, 1)
+    }
 
     # Store scenario
     all_scenarios[[i]] <- list(
@@ -245,7 +250,7 @@ run_minter_scenarios <- function(
       irs_use = irs[i],
       itn_future = net_next$itn_use,
       irs_future = irs_future[i],
-      lsm = lsm[i],
+      lsm = lsm_eff,
       scenario_id = scenario_ids[i]
     )
   }
@@ -255,7 +260,7 @@ run_minter_scenarios <- function(
   }
   
   # ---- Compute EIR validity + create scenario data frames for batch processing ----
-  eir_valid <- eir_values >= 0.68 & eir_values <= 371.0
+  eir_valid <- eir_values >= 0.68 & eir_values <= 350.0
   scenario_meta <- data.frame(
     scenario_tag = scenario_ids,
     eir_valid    = eir_valid,
