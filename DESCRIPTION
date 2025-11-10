@@ -1,6 +1,6 @@
 Package: MINTer
 Title: Malaria INTervention Emulator in R
-Version: 1.0.2
+Version: 1.0.3
 Authors@R: c(
     person("Cosmo", "Santoni", email = "cosmo.santoni@imperial.ac.uk", 
            role = c("aut", "cre")))
